@@ -4,13 +4,16 @@ import Dashboard from './components/Dashboard'
 import HistorialViajes from './components/HistorialViajes'
 import FormularioViaje from './components/FormularioViaje'
 import ConfigPrecios from './components/ConfigPrecios'
+import Libreta from './components/Libreta'
 import { useViajes } from './hooks/useViajes'
 import { usePrecios } from './hooks/usePrecios'
+import { useLibreta } from './hooks/useLibreta'
 
 export default function App() {
   const [tab, setTab] = useState('dashboard')
   const { viajes, agregarViaje, eliminarViaje } = useViajes()
   const { config, setPrecioEspecie, setTipoCambio, calcularTotalViaje } = usePrecios()
+  const { libreta, actualizarPerfil, actualizarDocumento, agregarDocumento, eliminarDocumento } = useLibreta()
 
   function handleGuardar(datos) {
     agregarViaje(datos)
@@ -34,6 +37,15 @@ export default function App() {
             onEliminar={eliminarViaje}
             calcularTotalViaje={calcularTotalViaje}
             config={config}
+          />
+        )}
+        {tab === 'libreta' && (
+          <Libreta
+            libreta={libreta}
+            actualizarPerfil={actualizarPerfil}
+            actualizarDocumento={actualizarDocumento}
+            agregarDocumento={agregarDocumento}
+            eliminarDocumento={eliminarDocumento}
           />
         )}
         {tab === 'precios' && (
