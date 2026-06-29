@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-const STORAGE_KEY = 'pescalog_libreta'
+const STORAGE_KEY = 'bitacoraar_libreta'
 
 const DEFAULTS = {
   nombre: '',

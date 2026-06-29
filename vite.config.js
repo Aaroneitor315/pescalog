@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'PescaLog',
-        short_name: 'PescaLog',
-        description: 'Registro de viajes de pesca de altura',
+        name: 'BitácoraAR',
+        short_name: 'BitácoraAR',
+        description: 'Registro de viajes de pesca de altura para tripulantes argentinos',
         theme_color: '#0d1630',
         background_color: '#0a0f1e',
         display: 'standalone',

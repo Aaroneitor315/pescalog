@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-const STORAGE_KEY = 'pescalog_precios'
+const STORAGE_KEY = 'bitacoraar_precios'
 
 const DEFAULTS = {
   tipoCambio: 1000,

@@ -15,7 +15,7 @@ export default function Navbar({ tab, setTab }) {
         <div className="flex items-center gap-2 mr-4 shrink-0">
           <Anchor className="text-cyan-400" size={22} />
           <span className="text-lg font-bold tracking-tight text-white">
-            Pesca<span className="text-cyan-400">Log</span>
+            Bitácora<span className="text-cyan-400">AR</span>
           </span>
         </div>
         <nav className="flex gap-1 overflow-x-auto scrollbar-none">

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-const STORAGE_KEY = 'pescalog_viajes'
+const STORAGE_KEY = 'bitacoraar_viajes'
 
 const VIAJES_DEMO = [
   {
