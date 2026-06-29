@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import Sponsors from './Sponsors'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
@@ -306,6 +307,10 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
           </div>
         </div>
       )}
+
+      <div className="border-t border-navy-700 pt-6">
+        <Sponsors />
+      </div>
     </div>
   )
 }
