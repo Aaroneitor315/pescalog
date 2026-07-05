@@ -5,24 +5,41 @@ import HistorialViajes from './components/HistorialViajes'
 import FormularioViaje from './components/FormularioViaje'
 import ConfigPrecios from './components/ConfigPrecios'
 import Libreta from './components/Libreta'
+import Login from './components/Login'
 import { useViajes } from './hooks/useViajes'
 import { usePrecios } from './hooks/usePrecios'
 import { useLibreta } from './hooks/useLibreta'
+import { useAuth } from './hooks/useAuth'
 
 export default function App() {
+  const { user, loading, cerrarSesion } = useAuth()
   const [tab, setTab] = useState('dashboard')
-  const { viajes, agregarViaje, eliminarViaje } = useViajes()
-  const { config, setPrecioEspecie, setTipoCambio, calcularTotalViaje } = usePrecios()
-  const { libreta, actualizarPerfil, actualizarDocumento, agregarDocumento, eliminarDocumento } = useLibreta()
+
+  const uid = user?.uid || null
+  const { viajes, agregarViaje, eliminarViaje } = useViajes(uid)
+  const { config, setPrecioEspecie, setTipoCambio, calcularTotalViaje } = usePrecios(uid)
+  const { libreta, actualizarPerfil, actualizarDocumento, agregarDocumento, eliminarDocumento } = useLibreta(uid)
 
   function handleGuardar(datos) {
     agregarViaje(datos)
     setTab('historial')
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-slate-400 animate-pulse">Cargando...</div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <Login />
+  }
+
   return (
     <div className="min-h-screen">
-      <Navbar tab={tab} setTab={setTab} />
+      <Navbar tab={tab} setTab={setTab} user={user} onCerrarSesion={cerrarSesion} />
       <main className="max-w-6xl mx-auto px-4 py-8 relative">
         <img
           src="/logo.png"

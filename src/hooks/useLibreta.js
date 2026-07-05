@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-
-const STORAGE_KEY = 'bitacoraar_libreta'
+import { doc, onSnapshot, setDoc } from 'firebase/firestore'
+import { db } from '../firebase'
 
 const DEFAULTS = {
   nombre: '',
@@ -14,42 +14,44 @@ const DEFAULTS = {
   ],
 }
 
-export function useLibreta() {
-  const [libreta, setLibreta] = useState(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        return { ...DEFAULTS, ...parsed, documentos: parsed.documentos || DEFAULTS.documentos }
-      }
-    } catch {}
-    return DEFAULTS
-  })
+export function useLibreta(uid) {
+  const [libreta, setLibreta] = useState(DEFAULTS)
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(libreta))
-    } catch {}
-  }, [libreta])
+    if (!uid) { setLibreta(DEFAULTS); return }
+    const ref = doc(db, 'usuarios', uid, 'config', 'libreta')
+    const unsub = onSnapshot(ref, snap => {
+      if (snap.exists()) {
+        const data = snap.data()
+        setLibreta({ ...DEFAULTS, ...data, documentos: data.documentos || DEFAULTS.documentos })
+      }
+    })
+    return unsub
+  }, [uid])
+
+  async function guardar(next) {
+    setLibreta(next)
+    if (uid) await setDoc(doc(db, 'usuarios', uid, 'config', 'libreta'), next)
+  }
 
   function actualizarPerfil(datos) {
-    setLibreta(prev => ({ ...prev, ...datos }))
+    guardar({ ...libreta, ...datos })
   }
 
   function actualizarDocumento(id, campo, valor) {
-    setLibreta(prev => ({
-      ...prev,
-      documentos: prev.documentos.map(d => d.id === id ? { ...d, [campo]: valor } : d),
-    }))
+    guardar({
+      ...libreta,
+      documentos: libreta.documentos.map(d => d.id === id ? { ...d, [campo]: valor } : d),
+    })
   }
 
   function agregarDocumento() {
     const nuevo = { id: crypto.randomUUID(), nombre: '', numero: '', vencimiento: '' }
-    setLibreta(prev => ({ ...prev, documentos: [...prev.documentos, nuevo] }))
+    guardar({ ...libreta, documentos: [...libreta.documentos, nuevo] })
   }
 
   function eliminarDocumento(id) {
-    setLibreta(prev => ({ ...prev, documentos: prev.documentos.filter(d => d.id !== id) }))
+    guardar({ ...libreta, documentos: libreta.documentos.filter(d => d.id !== id) })
   }
 
   return { libreta, actualizarPerfil, actualizarDocumento, agregarDocumento, eliminarDocumento }

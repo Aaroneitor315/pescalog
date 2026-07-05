@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-
-const STORAGE_KEY = 'bitacoraar_precios'
+import { doc, onSnapshot, setDoc } from 'firebase/firestore'
+import { db } from '../firebase'
 
 export const ESPECIES_LISTA = [
   'langostino',
@@ -14,19 +14,22 @@ export const ESPECIES_LISTA = [
 const preciosVacios = () => Object.fromEntries(ESPECIES_LISTA.map(e => [e, { ars: 0, usd: 0 }]))
 
 const DEFAULTS = {
-  tipoCambio: 1000,
+  tipoCambio: 0,
   precios: preciosVacios(),
 }
 
-export function usePrecios() {
-  const [config, setConfig] = useState(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored)
+export function usePrecios(uid) {
+  const [config, setConfig] = useState(DEFAULTS)
+
+  useEffect(() => {
+    if (!uid) { setConfig(DEFAULTS); return }
+    const ref = doc(db, 'usuarios', uid, 'config', 'precios')
+    const unsub = onSnapshot(ref, snap => {
+      if (snap.exists()) {
+        const data = snap.data()
         const precios = preciosVacios()
-        if (parsed.precios) {
-          Object.entries(parsed.precios).forEach(([esp, val]) => {
+        if (data.precios) {
+          Object.entries(data.precios).forEach(([esp, val]) => {
             if (typeof val === 'number') {
               precios[esp] = { ars: val, usd: 0 }
             } else if (val && typeof val === 'object') {
@@ -34,30 +37,30 @@ export function usePrecios() {
             }
           })
         }
-        return { ...DEFAULTS, ...parsed, precios }
+        setConfig({ ...DEFAULTS, ...data, precios })
       }
-    } catch {}
-    return DEFAULTS
-  })
+    })
+    return unsub
+  }, [uid])
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
-    } catch {}
-  }, [config])
-
-  function setPrecioEspecie(especie, campo, valor) {
-    setConfig(prev => ({
-      ...prev,
+  async function setPrecioEspecie(especie, campo, valor) {
+    if (!uid) return
+    const next = {
+      ...config,
       precios: {
-        ...prev.precios,
-        [especie]: { ...(prev.precios[especie] || { ars: 0, usd: 0 }), [campo]: Number(valor) || 0 },
+        ...config.precios,
+        [especie]: { ...(config.precios[especie] || { ars: 0, usd: 0 }), [campo]: Number(valor) || 0 },
       },
-    }))
+    }
+    setConfig(next)
+    await setDoc(doc(db, 'usuarios', uid, 'config', 'precios'), next)
   }
 
-  function setTipoCambio(valor) {
-    setConfig(prev => ({ ...prev, tipoCambio: Number(valor) || 0 }))
+  async function setTipoCambio(valor) {
+    if (!uid) return
+    const next = { ...config, tipoCambio: Number(valor) || 0 }
+    setConfig(next)
+    await setDoc(doc(db, 'usuarios', uid, 'config', 'precios'), next)
   }
 
   function getPrecio(especie) {

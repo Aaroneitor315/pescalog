@@ -1,0 +1,116 @@
+import { useState } from 'react'
+import { Anchor, Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { useAuth } from '../hooks/useAuth'
+
+export default function Login() {
+  const { registrar, iniciarSesion, error } = useAuth()
+  const [modo, setModo] = useState('login')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [verPass, setVerPass] = useState(false)
+  const [cargando, setCargando] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setCargando(true)
+    if (modo === 'login') {
+      await iniciarSesion(email, password)
+    } else {
+      await registrar(email, password)
+    }
+    setCargando(false)
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-navy-900">
+      <div className="w-full max-w-sm">
+        <div className="flex flex-col items-center mb-8">
+          <img src="/logo.png" alt="BitácoraAR" className="h-28 w-auto mb-4" />
+          <p className="text-slate-400 text-sm text-center">
+            Registro de pesca de altura para tripulantes argentinos
+          </p>
+        </div>
+
+        <div className="card">
+          <div className="flex mb-6 bg-navy-700 rounded-lg p-1">
+            <button
+              onClick={() => setModo('login')}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+                modo === 'login' ? 'bg-navy-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Iniciar sesión
+            </button>
+            <button
+              onClick={() => setModo('registro')}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+                modo === 'registro' ? 'bg-navy-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Registrarse
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label>Email</label>
+              <div className="relative">
+                <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="email"
+                  className="pl-9"
+                  placeholder="tu@email.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label>Contraseña</label>
+              <div className="relative">
+                <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type={verPass ? 'text' : 'password'}
+                  className="pl-9 pr-10"
+                  placeholder={modo === 'registro' ? 'Mínimo 6 caracteres' : '••••••••'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setVerPass(!verPass)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                >
+                  {verPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={cargando}
+              className="btn-primary w-full flex items-center justify-center gap-2 py-2.5"
+            >
+              {cargando ? (
+                <span className="animate-pulse">Cargando...</span>
+              ) : modo === 'login' ? 'Entrar' : 'Crear cuenta'}
+            </button>
+          </form>
+        </div>
+
+        <p className="text-center text-xs text-slate-600 mt-6">
+          BitácoraAR · Registro de pesca de altura
+        </p>
+      </div>
+    </div>
+  )
+}
