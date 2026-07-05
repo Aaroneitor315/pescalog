@@ -83,8 +83,9 @@ export default function ConfigPrecios({ config, setPrecioEspecie, setTipoCambio 
                         <input
                           type="number"
                           min="0"
+                          step="0.01"
                           className="pl-7"
-                          placeholder="0"
+                          placeholder="0.00"
                           value={precios[esp]?.ars ?? ''}
                           onChange={e => setP(esp, 'ars', e.target.value)}
                         />
@@ -97,8 +98,9 @@ export default function ConfigPrecios({ config, setPrecioEspecie, setTipoCambio 
                         <input
                           type="number"
                           min="0"
+                          step="0.01"
                           className="pl-10"
-                          placeholder="0"
+                          placeholder="0.00"
                           value={precios[esp]?.usd ?? ''}
                           onChange={e => setP(esp, 'usd', e.target.value)}
                         />
