@@ -4,6 +4,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  sendPasswordResetEmail,
 } from 'firebase/auth'
 import { auth } from '../firebase'
 
@@ -42,7 +43,18 @@ export function useAuth() {
     await signOut(auth)
   }
 
-  return { user, loading, error, registrar, iniciarSesion, cerrarSesion }
+  async function recuperarContrasena(email) {
+    setError('')
+    try {
+      await sendPasswordResetEmail(auth, email)
+      return true
+    } catch (e) {
+      setError(traducirError(e.code))
+      return false
+    }
+  }
+
+  return { user, loading, error, registrar, iniciarSesion, cerrarSesion, recuperarContrasena }
 }
 
 function traducirError(code) {
