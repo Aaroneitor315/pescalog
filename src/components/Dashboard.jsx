@@ -68,8 +68,18 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
     const totalPesos = viajesFiltrados.reduce((s, v) => s + calcularTotalViaje(v).ars, 0)
     const totalUSD = viajesFiltrados.reduce((s, v) => s + calcularTotalViaje(v).usd, 0)
     const totalSingladuras = viajesFiltrados.reduce((s, v) => s + calcularSingladuras(v.fechaSalida, v.fechaRegreso), 0)
-    const promedioSing = Math.round(totalSingladuras / viajesFiltrados.length)
-    return { total, promedio, mejor, cantidad: viajesFiltrados.length, totalPesos, totalUSD, totalSingladuras, promedioSing }
+    const totalEmbarcado = viajesFiltrados.reduce((s, v) => s + calcularSingladuras(v.fechaEmbarco, v.fechaDesembarco), 0)
+    // días embarcado por barco (suma de embarco-desembarco agrupado por nombre de barco)
+    const embarcadoPorBarco = {}
+    viajesFiltrados.forEach(v => {
+      const nombre = v.barco?.trim() || '(sin nombre)'
+      const dias = calcularSingladuras(v.fechaEmbarco, v.fechaDesembarco)
+      if (!embarcadoPorBarco[nombre]) embarcadoPorBarco[nombre] = { dias: 0, viajes: 0 }
+      embarcadoPorBarco[nombre].dias += dias
+      embarcadoPorBarco[nombre].viajes += 1
+    })
+    const barcosUnicos = Object.keys(embarcadoPorBarco).length
+    return { total, promedio, mejor, cantidad: viajesFiltrados.length, totalPesos, totalUSD, totalSingladuras, totalEmbarcado, embarcadoPorBarco, barcosUnicos }
   }, [viajesFiltrados, calcularTotalViaje, config])
 
   const datosGrafico = useMemo(() => {
@@ -152,22 +162,47 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
             />
           </div>
 
-          {/* Singladuras */}
+          {/* Singladuras y días embarcado */}
           <div className="grid grid-cols-2 gap-4">
             <StatCard
               icon={Waves}
               label="Total singladuras"
               value={stats.totalSingladuras}
-              sub="días en el mar (acumulado)"
+              sub="días navegados (acumulado)"
               accent="text-cyan-400"
             />
             <StatCard
               icon={Waves}
-              label="Promedio singladuras"
-              value={stats.promedioSing}
-              sub="días por viaje"
+              label="Días embarcado"
+              value={stats.totalEmbarcado}
+              sub={`${stats.barcosUnicos} barco${stats.barcosUnicos !== 1 ? 's' : ''} distintos`}
             />
           </div>
+
+          {/* Días embarcado por barco */}
+          {stats.totalEmbarcado > 0 && (() => {
+            const lista = Object.entries(stats.embarcadoPorBarco)
+              .sort((a, b) => b[1].dias - a[1].dias)
+            const maxDias = lista[0]?.[1].dias || 1
+            return (
+              <div className="card">
+                <h3 className="text-sm font-semibold text-white mb-3">Días embarcado por barco</h3>
+                <div className="space-y-2">
+                  {lista.map(([barco, { dias, viajes }]) => (
+                    <div key={barco} className="flex items-center gap-3">
+                      <span className="text-sm text-slate-300 w-32 shrink-0 truncate">{barco}</span>
+                      <div className="flex-1 h-2 bg-navy-700 rounded-full overflow-hidden">
+                        <div className="h-full bg-cyan-500 rounded-full transition-all"
+                          style={{ width: `${(dias / maxDias) * 100}%` }} />
+                      </div>
+                      <span className="text-sm text-cyan-400 w-16 text-right shrink-0 font-medium">{dias} días</span>
+                      <span className="text-xs text-slate-500 w-14 text-right shrink-0">{viajes} viaje{viajes !== 1 ? 's' : ''}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Stats financieras */}
           {hayPrecios ? (
