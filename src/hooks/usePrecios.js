@@ -2,16 +2,20 @@ import { useState, useEffect } from 'react'
 
 const STORAGE_KEY = 'bitacoraar_precios'
 
+export const ESPECIES_LISTA = [
+  'langostino',
+  'calamar',
+  'merluza',
+  'abadejo',
+  'pescado de costa A',
+  'pescado de costa B',
+]
+
+const preciosVacios = () => Object.fromEntries(ESPECIES_LISTA.map(e => [e, { ars: 0, usd: 0 }]))
+
 const DEFAULTS = {
   tipoCambio: 1000,
-  precios: {
-    merluza: 0,
-    calamar: 0,
-    langostino: 0,
-    centolla: 0,
-    polaca: 0,
-    abadejo: 0,
-  },
+  precios: preciosVacios(),
 }
 
 export function usePrecios() {
@@ -20,7 +24,17 @@ export function usePrecios() {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
         const parsed = JSON.parse(stored)
-        return { ...DEFAULTS, ...parsed, precios: { ...DEFAULTS.precios, ...parsed.precios } }
+        const precios = preciosVacios()
+        if (parsed.precios) {
+          Object.entries(parsed.precios).forEach(([esp, val]) => {
+            if (typeof val === 'number') {
+              precios[esp] = { ars: val, usd: 0 }
+            } else if (val && typeof val === 'object') {
+              precios[esp] = { ars: val.ars || 0, usd: val.usd || 0 }
+            }
+          })
+        }
+        return { ...DEFAULTS, ...parsed, precios }
       }
     } catch {}
     return DEFAULTS
@@ -32,10 +46,13 @@ export function usePrecios() {
     } catch {}
   }, [config])
 
-  function setPrecioEspecie(especie, valor) {
+  function setPrecioEspecie(especie, campo, valor) {
     setConfig(prev => ({
       ...prev,
-      precios: { ...prev.precios, [especie]: Number(valor) || 0 },
+      precios: {
+        ...prev.precios,
+        [especie]: { ...(prev.precios[especie] || { ars: 0, usd: 0 }), [campo]: Number(valor) || 0 },
+      },
     }))
   }
 
@@ -44,12 +61,15 @@ export function usePrecios() {
   }
 
   function getPrecio(especie) {
-    return config.precios[especie] || 0
+    return config.precios[especie] || { ars: 0, usd: 0 }
   }
 
   function calcularTotalViaje(viaje) {
     const precio = getPrecio(viaje.especie)
-    return precio * viaje.cajones
+    return {
+      ars: (precio.ars || 0) * (viaje.cajones || 0),
+      usd: (precio.usd || 0) * (viaje.cajones || 0),
+    }
   }
 
   return { config, setPrecioEspecie, setTipoCambio, getPrecio, calcularTotalViaje }

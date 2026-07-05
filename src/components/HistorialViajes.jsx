@@ -27,7 +27,8 @@ export default function HistorialViajes({ viajes, onEliminar, calcularTotalViaje
   const [orden, setOrden] = useState({ col: 'fechaSalida', asc: false })
   const [confirmarId, setConfirmarId] = useState(null)
 
-  const hayPrecios = Object.values(config.precios).some(p => p > 0)
+  const hayPrecios = Object.values(config.precios).some(p => (p?.ars > 0 || p?.usd > 0))
+  const hayPreciosUSD = Object.values(config.precios).some(p => p?.usd > 0)
 
   function toggleOrden(col) {
     setOrden(prev => prev.col === col ? { col, asc: !prev.asc } : { col, asc: false })
@@ -50,7 +51,7 @@ export default function HistorialViajes({ viajes, onEliminar, calcularTotalViaje
         vb = calcularSingladuras(b.fechaSalida, b.fechaRegreso)
       }
       else if (orden.col === 'totalPesos') {
-        va = calcularTotalViaje(a); vb = calcularTotalViaje(b)
+        va = calcularTotalViaje(a).ars; vb = calcularTotalViaje(b).ars
       }
       else { va = a[orden.col]; vb = b[orden.col] }
       if (va < vb) return orden.asc ? -1 : 1
@@ -58,8 +59,10 @@ export default function HistorialViajes({ viajes, onEliminar, calcularTotalViaje
       return 0
     })
 
-  const totalGeneral = filtrados.reduce((s, v) => s + calcularTotalViaje(v), 0)
-  const totalUSD = config.tipoCambio > 0 ? totalGeneral / config.tipoCambio : 0
+  const totalGeneral = {
+    ars: filtrados.reduce((s, v) => s + calcularTotalViaje(v).ars, 0),
+    usd: filtrados.reduce((s, v) => s + calcularTotalViaje(v).usd, 0),
+  }
   const totalSingladuras = filtrados.reduce((s, v) => s + calcularSingladuras(v.fechaSalida, v.fechaRegreso), 0)
 
   function SortIcon({ col }) {
@@ -106,17 +109,16 @@ export default function HistorialViajes({ viajes, onEliminar, calcularTotalViaje
           <span className="text-xs text-slate-500 uppercase tracking-wider">Total singladuras</span>
           <span className="text-cyan-400 font-bold text-lg">{totalSingladuras}</span>
         </div>
-        {hayPrecios && totalGeneral > 0 && (
+        {hayPrecios && totalGeneral.ars > 0 && (
           <div className="bg-green-900/20 border border-green-800/40 rounded-lg px-4 py-2 flex items-center gap-2">
             <span className="text-xs text-slate-500 uppercase tracking-wider">Total ARS</span>
-            <span className="text-green-400 font-bold text-lg">{fmtPesos(totalGeneral)}</span>
+            <span className="text-green-400 font-bold text-lg">{fmtPesos(totalGeneral.ars)}</span>
           </div>
         )}
-        {hayPrecios && totalGeneral > 0 && config.tipoCambio > 0 && (
+        {hayPreciosUSD && totalGeneral.usd > 0 && (
           <div className="bg-blue-900/20 border border-blue-800/40 rounded-lg px-4 py-2 flex items-center gap-2">
             <span className="text-xs text-slate-500 uppercase tracking-wider">Total USD</span>
-            <span className="text-blue-400 font-bold text-lg">{fmtUSD(totalUSD)}</span>
-            <span className="text-xs text-slate-600">TC ${config.tipoCambio.toLocaleString('es-AR')}</span>
+            <span className="text-blue-400 font-bold text-lg">{fmtUSD(totalGeneral.usd)}</span>
           </div>
         )}
       </div>
@@ -141,7 +143,7 @@ export default function HistorialViajes({ viajes, onEliminar, calcularTotalViaje
                 <TH col="especie">Especie</TH>
                 <TH col="cajones" right>Cajones</TH>
                 {hayPrecios && <TH col="totalPesos" right>Total ARS</TH>}
-                {hayPrecios && config.tipoCambio > 0 && (
+                {hayPreciosUSD && (
                   <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Total USD</th>
                 )}
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Observaciones</th>
@@ -152,7 +154,6 @@ export default function HistorialViajes({ viajes, onEliminar, calcularTotalViaje
               {filtrados.map(v => {
                 const sing = calcularSingladuras(v.fechaSalida, v.fechaRegreso)
                 const totalViaje = calcularTotalViaje(v)
-                const usdViaje = config.tipoCambio > 0 ? totalViaje / config.tipoCambio : 0
                 return (
                   <tr key={v.id} className="hover:bg-navy-700/50 transition-colors group">
                     <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{fmtFecha(v.fechaSalida)}</td>
@@ -177,15 +178,15 @@ export default function HistorialViajes({ viajes, onEliminar, calcularTotalViaje
                     </td>
                     {hayPrecios && (
                       <td className="px-4 py-3 text-right whitespace-nowrap">
-                        {fmtPesos(totalViaje)
-                          ? <span className="text-green-400 font-medium">{fmtPesos(totalViaje)}</span>
+                        {fmtPesos(totalViaje.ars)
+                          ? <span className="text-green-400 font-medium">{fmtPesos(totalViaje.ars)}</span>
                           : <span className="text-slate-600 text-xs">sin precio</span>}
                       </td>
                     )}
-                    {hayPrecios && config.tipoCambio > 0 && (
+                    {hayPreciosUSD && (
                       <td className="px-4 py-3 text-right whitespace-nowrap">
-                        {fmtUSD(usdViaje)
-                          ? <span className="text-blue-400 text-sm">{fmtUSD(usdViaje)}</span>
+                        {fmtUSD(totalViaje.usd)
+                          ? <span className="text-blue-400 text-sm">{fmtUSD(totalViaje.usd)}</span>
                           : <span className="text-slate-600 text-xs">—</span>}
                       </td>
                     )}

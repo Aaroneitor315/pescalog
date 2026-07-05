@@ -65,8 +65,8 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
     const total = viajesFiltrados.reduce((s, v) => s + v.cajones, 0)
     const promedio = Math.round(total / viajesFiltrados.length)
     const mejor = viajesFiltrados.reduce((m, v) => v.cajones > m.cajones ? v : m)
-    const totalPesos = viajesFiltrados.reduce((s, v) => s + calcularTotalViaje(v), 0)
-    const totalUSD = config.tipoCambio > 0 ? totalPesos / config.tipoCambio : 0
+    const totalPesos = viajesFiltrados.reduce((s, v) => s + calcularTotalViaje(v).ars, 0)
+    const totalUSD = viajesFiltrados.reduce((s, v) => s + calcularTotalViaje(v).usd, 0)
     const totalSingladuras = viajesFiltrados.reduce((s, v) => s + calcularSingladuras(v.fechaSalida, v.fechaRegreso), 0)
     const promedioSing = Math.round(totalSingladuras / viajesFiltrados.length)
     return { total, promedio, mejor, cantidad: viajesFiltrados.length, totalPesos, totalUSD, totalSingladuras, promedioSing }
@@ -93,7 +93,7 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
 
   const maxCajones = Math.max(...datosGrafico.map(d => d.cajones), 1)
 
-  const hayPrecios = Object.values(config.precios).some(p => p > 0)
+  const hayPrecios = Object.values(config.precios).some(p => (p?.ars > 0 || p?.usd > 0))
 
   if (!viajes.length) {
     return (
@@ -195,18 +195,9 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Total facturado (USD)</p>
-                    {config.tipoCambio > 0 ? (
-                      <>
-                        <p className="text-3xl font-bold mt-1 text-blue-400">
-                          {stats.totalUSD > 0 ? fmtUSD(stats.totalUSD) : <span className="text-slate-600 text-xl">Sin precio configurado</span>}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-1">
-                          TC: $ {config.tipoCambio.toLocaleString('es-AR')} / USD
-                        </p>
-                      </>
-                    ) : (
-                      <p className="text-slate-600 text-base mt-2">Configurá el tipo de cambio</p>
-                    )}
+                    <p className="text-3xl font-bold mt-1 text-blue-400">
+                        {stats.totalUSD > 0 ? fmtUSD(stats.totalUSD) : <span className="text-slate-600 text-xl">Sin precio configurado</span>}
+                      </p>
                   </div>
                   <div className="bg-blue-900/30 p-2 rounded-lg">
                     <DollarSign size={20} className="text-blue-400" />
@@ -286,11 +277,11 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-slate-300">{capitalize(esp)}</span>
                       <div className="flex gap-3">
-                        {config.precios[esp] > 0 && config.tipoCambio > 0 && (
-                          <span className="text-blue-400 text-xs">{fmtUSD((n * config.precios[esp]) / config.tipoCambio)}</span>
+                        {(config.precios[esp]?.usd > 0) && (
+                          <span className="text-blue-400 text-xs">{fmtUSD(n * config.precios[esp].usd)}</span>
                         )}
-                        {config.precios[esp] > 0 && (
-                          <span className="text-green-400 text-xs">{fmtPesos(n * config.precios[esp])}</span>
+                        {(config.precios[esp]?.ars > 0) && (
+                          <span className="text-green-400 text-xs">{fmtPesos(n * config.precios[esp].ars)}</span>
                         )}
                         <span className="text-white font-medium">{n.toLocaleString('es-AR')} caj.</span>
                       </div>
