@@ -6,6 +6,7 @@ import FormularioViaje from './components/FormularioViaje'
 import ConfigPrecios from './components/ConfigPrecios'
 import Libreta from './components/Libreta'
 import Login from './components/Login'
+import AdminPanel from './components/AdminPanel'
 import { useViajes } from './hooks/useViajes'
 import { usePrecios } from './hooks/usePrecios'
 import { useLibreta } from './hooks/useLibreta'
@@ -85,6 +86,7 @@ export default function App() {
             onCancelar={() => setTab('dashboard')}
           />
         )}
+        {tab === 'admin' && <AdminPanel />}
       </main>
     </div>
   )

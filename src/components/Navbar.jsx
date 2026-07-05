@@ -1,4 +1,5 @@
-import { LogOut } from 'lucide-react'
+import { LogOut, Shield } from 'lucide-react'
+import { esAdmin } from '../hooks/useAdmin'
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -9,6 +10,7 @@ const TABS = [
 ]
 
 export default function Navbar({ tab, setTab, user, onCerrarSesion }) {
+  const admin = esAdmin(user)
   return (
     <header className="bg-navy-800 border-b border-navy-700 sticky top-0 z-10">
       <div className="w-full flex justify-center py-3 border-b border-navy-700/50 relative">
@@ -37,6 +39,14 @@ export default function Navbar({ tab, setTab, user, onCerrarSesion }) {
               {t.label}
             </button>
           ))}
+          {admin && (
+            <button
+              onClick={() => setTab('admin')}
+              className={`nav-tab whitespace-nowrap flex items-center gap-1.5 ${tab === 'admin' ? 'active' : ''}`}
+            >
+              <Shield size={13} className="text-yellow-400" /> Admin
+            </button>
+          )}
         </nav>
       </div>
     </header>
