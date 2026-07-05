@@ -12,7 +12,7 @@ export default function Navbar({ tab, setTab }) {
     <header className="bg-navy-800 border-b border-navy-700 sticky top-0 z-10">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-6">
         <div className="flex items-center mr-4 shrink-0">
-          <img src="/logo.png" alt="BitácoraAR" className="h-12 w-auto" />
+          <img src="/logo.png" alt="BitácoraAR" className="h-16 w-auto" />
         </div>
         <nav className="flex gap-1 overflow-x-auto scrollbar-none">
           {TABS.map(t => (
