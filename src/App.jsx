@@ -28,7 +28,7 @@ export default function App() {
           src="/logo.png"
           alt=""
           aria-hidden="true"
-          className="fixed bottom-6 right-6 w-56 opacity-[0.07] pointer-events-none select-none z-0"
+          className="fixed bottom-4 right-4 w-80 opacity-[0.09] pointer-events-none select-none z-0"
         />
         {tab === 'dashboard' && (
           <Dashboard
