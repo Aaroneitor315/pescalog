@@ -196,20 +196,10 @@ export default function HistorialViajes({ viajes, onEliminar, calcularTotalViaje
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {confirmarId === v.id ? (
-                        <div className="flex gap-2 items-center">
-                          <span className="text-xs text-slate-400">¿Eliminar?</span>
-                          <button onClick={() => { onEliminar(v.id); setConfirmarId(null) }}
-                            className="text-xs text-red-400 hover:text-red-300 font-medium">Sí</button>
-                          <button onClick={() => setConfirmarId(null)}
-                            className="text-xs text-slate-500 hover:text-slate-300">No</button>
-                        </div>
-                      ) : (
-                        <button onClick={() => setConfirmarId(v.id)}
-                          className="btn-danger opacity-0 group-hover:opacity-100" title="Eliminar viaje">
-                          <Trash2 size={15} />
-                        </button>
-                      )}
+                      <button onClick={() => setConfirmarId(v.id)}
+                        className="btn-danger opacity-0 group-hover:opacity-100" title="Eliminar viaje">
+                        <Trash2 size={15} />
+                      </button>
                     </td>
                   </tr>
                 )
@@ -218,6 +208,31 @@ export default function HistorialViajes({ viajes, onEliminar, calcularTotalViaje
           </table>
         </div>
       )}
+      {confirmarId && (() => {
+        const v = viajes.find(x => x.id === confirmarId)
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+            onClick={() => setConfirmarId(null)}>
+            <div className="bg-navy-800 border border-navy-600 rounded-2xl p-6 w-full max-w-sm shadow-xl"
+              onClick={e => e.stopPropagation()}>
+              <h3 className="text-white font-semibold text-base mb-1">¿Eliminar este viaje?</h3>
+              {v && (
+                <p className="text-slate-400 text-sm mb-5">
+                  {v.barco || 'Sin barco'} · {fmtFecha(v.fechaSalida)} · {v.cajones} cajones
+                </p>
+              )}
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => setConfirmarId(null)}
+                  className="btn-ghost px-4 py-2 text-sm">Cancelar</button>
+                <button onClick={() => { onEliminar(confirmarId); setConfirmarId(null) }}
+                  className="bg-red-600 hover:bg-red-500 text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
+                  <Trash2 size={15} /> Eliminar
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
