@@ -19,7 +19,7 @@ function fmtFecha(iso) {
 
 export default function Libreta({ libreta, actualizarPerfil, actualizarDocumento, agregarDocumento, eliminarDocumento }) {
   const [editandoPerfil, setEditandoPerfil] = useState(!libreta.nombre)
-  const [perfil, setPerfil] = useState({ nombre: libreta.nombre, cuil: libreta.cuil, matricula: libreta.matricula })
+  const [perfil, setPerfil] = useState({ nombre: libreta.nombre, dni: libreta.dni, cuil: libreta.cuil, nroLibreta: libreta.nroLibreta })
   const [guardadoPerfil, setGuardadoPerfil] = useState(false)
 
   const alertas = libreta.documentos.filter(d => {
@@ -69,33 +69,44 @@ export default function Libreta({ libreta, actualizarPerfil, actualizarDocumento
                     value={perfil.nombre} onChange={e => setPerfil(p => ({ ...p, nombre: e.target.value }))} />
                 </div>
                 <div>
+                  <label>DNI</label>
+                  <input type="text" placeholder="Ej: 38.123.456"
+                    value={perfil.dni} onChange={e => setPerfil(p => ({ ...p, dni: e.target.value }))} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
                   <label>CUIL</label>
                   <input type="text" placeholder="Ej: 20-12345678-9"
                     value={perfil.cuil} onChange={e => setPerfil(p => ({ ...p, cuil: e.target.value }))} />
                 </div>
-              </div>
-              <div>
-                <label>Matrícula / N° de libreta</label>
-                <input type="text" placeholder="Ej: MDP-12345"
-                  value={perfil.matricula} onChange={e => setPerfil(p => ({ ...p, matricula: e.target.value }))} />
+                <div>
+                  <label>N° de libreta de embarque</label>
+                  <input type="text" placeholder="Ej: 00123456"
+                    value={perfil.nroLibreta} onChange={e => setPerfil(p => ({ ...p, nroLibreta: e.target.value }))} />
+                </div>
               </div>
               <button onClick={guardarPerfil} className={`btn-primary flex items-center gap-2 ${guardadoPerfil ? 'bg-green-500 hover:bg-green-400' : ''}`}>
                 <Save size={15} /> {guardadoPerfil ? '¡Guardado!' : 'Guardar datos'}
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Titular</p>
-                <p className="text-white font-semibold text-lg">{libreta.nombre || <span className="text-slate-600 italic text-base">Sin completar</span>}</p>
+                <p className="text-white font-semibold">{libreta.nombre || <span className="text-slate-600 italic text-sm">Sin completar</span>}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">DNI</p>
+                <p className="text-slate-300 font-mono">{libreta.dni || <span className="text-slate-600 italic font-sans">—</span>}</p>
               </div>
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">CUIL</p>
-                <p className="text-slate-300 font-mono">{libreta.cuil || <span className="text-slate-600 italic">—</span>}</p>
+                <p className="text-slate-300 font-mono">{libreta.cuil || <span className="text-slate-600 italic font-sans">—</span>}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Matrícula / N° libreta</p>
-                <p className="text-cyan-400 font-mono font-semibold">{libreta.matricula || <span className="text-slate-600 italic font-sans font-normal">—</span>}</p>
+                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">N° libreta</p>
+                <p className="text-cyan-400 font-mono font-semibold">{libreta.nroLibreta || <span className="text-slate-600 italic font-sans font-normal">—</span>}</p>
               </div>
             </div>
           )}

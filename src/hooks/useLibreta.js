@@ -4,8 +4,9 @@ import { db } from '../firebase'
 
 const DEFAULTS = {
   nombre: '',
+  dni: '',
   cuil: '',
-  matricula: '',
+  nroLibreta: '',
   documentos: [
     { id: '1', nombre: 'Reconocimiento Médico', numero: '', vencimiento: '' },
     { id: '2', nombre: 'Título', numero: '', vencimiento: '' },
