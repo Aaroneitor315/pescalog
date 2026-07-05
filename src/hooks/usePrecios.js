@@ -63,6 +63,17 @@ export function usePrecios(uid) {
     await setDoc(doc(db, 'usuarios', uid, 'config', 'precios'), next)
   }
 
+  async function guardarTodos(nuevosPrecios, nuevoTipoCambio) {
+    if (!uid) return
+    const precios = preciosVacios()
+    Object.entries(nuevosPrecios).forEach(([esp, val]) => {
+      precios[esp] = { ars: Number(val.ars) || 0, usd: Number(val.usd) || 0 }
+    })
+    const next = { tipoCambio: Number(nuevoTipoCambio) || 0, precios }
+    setConfig(next)
+    await setDoc(doc(db, 'usuarios', uid, 'config', 'precios'), next)
+  }
+
   function getPrecio(especie) {
     return config.precios[especie] || { ars: 0, usd: 0 }
   }
@@ -75,5 +86,5 @@ export function usePrecios(uid) {
     }
   }
 
-  return { config, setPrecioEspecie, setTipoCambio, getPrecio, calcularTotalViaje }
+  return { config, setPrecioEspecie, setTipoCambio, guardarTodos, getPrecio, calcularTotalViaje }
 }

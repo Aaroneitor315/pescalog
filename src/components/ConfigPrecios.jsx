@@ -6,7 +6,7 @@ function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
 }
 
-export default function ConfigPrecios({ config, setPrecioEspecie, setTipoCambio }) {
+export default function ConfigPrecios({ config, guardarTodos }) {
   const [tc, setTc] = useState(String(config.tipoCambio || ''))
   const [precios, setPrecios] = useState(() => {
     const p = {}
@@ -23,13 +23,9 @@ export default function ConfigPrecios({ config, setPrecioEspecie, setTipoCambio 
     setGuardado(false)
   }
 
-  function handleGuardar(e) {
+  async function handleGuardar(e) {
     e.preventDefault()
-    setTipoCambio(Number(tc) || 0)
-    Object.entries(precios).forEach(([esp, val]) => {
-      setPrecioEspecie(esp, 'ars', val.ars)
-      setPrecioEspecie(esp, 'usd', val.usd)
-    })
+    await guardarTodos(precios, tc)
     setGuardado(true)
     setTimeout(() => setGuardado(false), 2000)
   }

@@ -18,7 +18,7 @@ export default function App() {
 
   const uid = user?.uid || null
   const { viajes, agregarViaje, eliminarViaje } = useViajes(uid)
-  const { config, setPrecioEspecie, setTipoCambio, calcularTotalViaje } = usePrecios(uid)
+  const { config, setPrecioEspecie, setTipoCambio, guardarTodos, calcularTotalViaje } = usePrecios(uid)
   const { libreta, actualizarPerfil, actualizarDocumento, agregarDocumento, eliminarDocumento } = useLibreta(uid)
 
   function handleGuardar(datos) {
@@ -77,6 +77,7 @@ export default function App() {
             config={config}
             setPrecioEspecie={setPrecioEspecie}
             setTipoCambio={setTipoCambio}
+            guardarTodos={guardarTodos}
             viajes={viajes}
           />
         )}
