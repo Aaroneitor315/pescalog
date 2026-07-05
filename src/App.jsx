@@ -23,7 +23,13 @@ export default function App() {
   return (
     <div className="min-h-screen">
       <Navbar tab={tab} setTab={setTab} />
-      <main className="max-w-6xl mx-auto px-4 py-8">
+      <main className="max-w-6xl mx-auto px-4 py-8 relative">
+        <img
+          src="/logo.png"
+          alt=""
+          aria-hidden="true"
+          className="fixed bottom-6 right-6 w-36 opacity-[0.04] pointer-events-none select-none z-0"
+        />
         {tab === 'dashboard' && (
           <Dashboard
             viajes={viajes}
