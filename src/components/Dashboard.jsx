@@ -162,27 +162,79 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
             />
           </div>
 
-          {/* Singladuras y días embarcado */}
-          <div className="grid grid-cols-2 gap-4">
-            <StatCard
-              icon={Waves}
-              label="Total singladuras"
-              value={stats.totalSingladuras}
-              sub="días navegados (acumulado)"
-              accent="text-cyan-400"
-            />
-            <StatCard
-              icon={Waves}
-              label="Días embarcado"
-              value={stats.totalEmbarcado}
-              sub={`${stats.barcosUnicos} barco${stats.barcosUnicos !== 1 ? 's' : ''} distintos`}
-            />
+          {/* Stats financieras — siempre visibles */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="card border-l-4 border-l-green-500" style={{borderRadius: '0 12px 12px 0'}}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Total facturado (ARS)</p>
+                  <p className="text-3xl font-bold mt-1 text-green-400">
+                    {stats.totalPesos > 0 ? fmtPesos(stats.totalPesos) : <span className="text-slate-600 text-xl">Configurar precios</span>}
+                  </p>
+                  {stats.cantidad > 1 && stats.totalPesos > 0 && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      Prom. {fmtPesos(stats.totalPesos / stats.cantidad)} / viaje
+                    </p>
+                  )}
+                  {stats.totalPesos === 0 && (
+                    <p className="text-xs text-slate-600 mt-1">
+                      Ingresá precios en la pestaña <span className="text-cyan-400">Precios</span>
+                    </p>
+                  )}
+                </div>
+                <div className="bg-green-900/30 p-2 rounded-lg">
+                  <Banknote size={20} className="text-green-400" />
+                </div>
+              </div>
+            </div>
+
+            <div className="card border-l-4 border-l-blue-400" style={{borderRadius: '0 12px 12px 0'}}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Total facturado (USD)</p>
+                  <p className="text-3xl font-bold mt-1 text-blue-400">
+                    {stats.totalUSD > 0 ? fmtUSD(stats.totalUSD) : <span className="text-slate-600 text-xl">Configurar precios</span>}
+                  </p>
+                  {stats.cantidad > 1 && stats.totalUSD > 0 && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      Prom. {fmtUSD(stats.totalUSD / stats.cantidad)} / viaje
+                    </p>
+                  )}
+                </div>
+                <div className="bg-blue-900/30 p-2 rounded-lg">
+                  <DollarSign size={20} className="text-blue-400" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Singladuras y días embarcado — compactos */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="card" style={{padding: '10px 14px'}}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wider" style={{fontSize:'10px'}}>Total singladuras</p>
+                  <p className="text-lg font-semibold mt-0.5 text-cyan-400">{stats.totalSingladuras}</p>
+                  <p className="text-slate-500" style={{fontSize:'10px',marginTop:'2px'}}>días navegados</p>
+                </div>
+                <Waves size={16} className="text-slate-600 mt-1" />
+              </div>
+            </div>
+            <div className="card" style={{padding: '10px 14px'}}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wider" style={{fontSize:'10px'}}>Días embarcado</p>
+                  <p className="text-lg font-semibold mt-0.5 text-white">{stats.totalEmbarcado}</p>
+                  <p className="text-slate-500" style={{fontSize:'10px',marginTop:'2px'}}>{stats.barcosUnicos} barco{stats.barcosUnicos !== 1 ? 's' : ''} distintos</p>
+                </div>
+                <Waves size={16} className="text-slate-600 mt-1" />
+              </div>
+            </div>
           </div>
 
           {/* Días embarcado por barco */}
           {stats.totalEmbarcado > 0 && (() => {
-            const lista = Object.entries(stats.embarcadoPorBarco)
-              .sort((a, b) => b[1].dias - a[1].dias)
+            const lista = Object.entries(stats.embarcadoPorBarco).sort((a, b) => b[1].dias - a[1].dias)
             const maxDias = lista[0]?.[1].dias || 1
             return (
               <div className="card">
@@ -192,8 +244,7 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
                     <div key={barco} className="flex items-center gap-3">
                       <span className="text-sm text-slate-300 w-32 shrink-0 truncate">{barco}</span>
                       <div className="flex-1 h-2 bg-navy-700 rounded-full overflow-hidden">
-                        <div className="h-full bg-cyan-500 rounded-full transition-all"
-                          style={{ width: `${(dias / maxDias) * 100}%` }} />
+                        <div className="h-full bg-cyan-500 rounded-full transition-all" style={{ width: `${(dias / maxDias) * 100}%` }} />
                       </div>
                       <span className="text-sm text-cyan-400 w-16 text-right shrink-0 font-medium">{dias} días</span>
                       <span className="text-xs text-slate-500 w-14 text-right shrink-0">{viajes} viaje{viajes !== 1 ? 's' : ''}</span>
@@ -203,51 +254,6 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
               </div>
             )
           })()}
-
-          {/* Stats financieras */}
-          {hayPrecios ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="card border-l-4 border-l-green-500">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Total facturado (ARS)</p>
-                    <p className="text-3xl font-bold mt-1 text-green-400">
-                      {stats.totalPesos > 0 ? fmtPesos(stats.totalPesos) : <span className="text-slate-600 text-xl">Sin precio configurado</span>}
-                    </p>
-                    {stats.cantidad > 1 && stats.totalPesos > 0 && (
-                      <p className="text-xs text-slate-500 mt-1">
-                        Prom. {fmtPesos(stats.totalPesos / stats.cantidad)} / viaje
-                      </p>
-                    )}
-                  </div>
-                  <div className="bg-green-900/30 p-2 rounded-lg">
-                    <Banknote size={20} className="text-green-400" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="card border-l-4 border-l-blue-400">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Total facturado (USD)</p>
-                    <p className="text-3xl font-bold mt-1 text-blue-400">
-                        {stats.totalUSD > 0 ? fmtUSD(stats.totalUSD) : <span className="text-slate-600 text-xl">Sin precio configurado</span>}
-                      </p>
-                  </div>
-                  <div className="bg-blue-900/30 p-2 rounded-lg">
-                    <DollarSign size={20} className="text-blue-400" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="card border border-dashed border-navy-600 text-center py-5">
-              <p className="text-slate-500 text-sm">
-                Configurá el valor por cajón en la pestaña{' '}
-                <span className="text-cyan-400 font-medium">Precios</span> para ver los totales en pesos y dólares.
-              </p>
-            </div>
-          )}
         </>
       ) : (
         <div className="card text-center py-10 text-slate-500">
