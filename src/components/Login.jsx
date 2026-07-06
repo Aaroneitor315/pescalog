@@ -1,6 +1,34 @@
 import { useState } from 'react'
-import { Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, ArrowLeft, X } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+
+const TERMINOS_TEXTO = `TÉRMINOS Y CONDICIONES DE USO — BitácoraAR
+Última actualización: julio de 2026
+
+1. DESCRIPCIÓN DEL SERVICIO
+BitácoraAR es una aplicación web progresiva (PWA) destinada al registro digital de viajes de pesca de altura para tripulantes argentinos. Permite registrar viajes, documentación personal, calcular singladuras, días embarcados y estimaciones de facturación por especie.
+
+2. REGISTRO Y CUENTA DE USUARIO
+Para utilizar BitácoraAR es necesario crear una cuenta con email y contraseña. El usuario es el único responsable de mantener la confidencialidad de sus credenciales. No está permitido compartir la cuenta con terceros ni crear cuentas en nombre de otras personas sin su consentimiento.
+
+3. DATOS PERSONALES Y PRIVACIDAD
+BitácoraAR almacena únicamente los datos que el usuario ingresa voluntariamente: dirección de email, datos de perfil (nombre, DNI, CUIL, N° de libreta de embarque), registros de viajes y documentación. Estos datos no son compartidos con terceros ni utilizados con fines comerciales. La infraestructura de almacenamiento es provista por Firebase (Google), sujeta a sus propias políticas de privacidad y seguridad. El usuario puede solicitar la eliminación de su cuenta y datos en cualquier momento contactándose al email indicado en el punto 8.
+
+4. USO PERMITIDO
+La app es de uso personal y exclusivo del tripulante registrado. Queda prohibido utilizar BitácoraAR con fines comerciales, revender el acceso, realizar ingeniería inversa sobre el código o intentar acceder a datos de otros usuarios.
+
+5. LIMITACIÓN DE RESPONSABILIDAD
+La información registrada en BitácoraAR es ingresada por el propio usuario y es de su exclusiva responsabilidad. Los cálculos de facturación, singladuras y días embarcados son estimativos y no reemplazan la documentación oficial emitida por empresas armadoras, la Prefectura Naval Argentina ni ningún organismo competente. BitácoraAR no se responsabiliza por errores derivados de datos incorrectamente ingresados.
+
+6. DISPONIBILIDAD DEL SERVICIO
+BitácoraAR se ofrece de forma gratuita en su versión actual. El servicio puede experimentar interrupciones por mantenimiento, actualizaciones o causas ajenas al control del desarrollador. No se garantiza disponibilidad continua del 100%.
+
+7. PROPIEDAD INTELECTUAL
+El nombre BitácoraAR, el logotipo, el diseño visual y el código fuente de la aplicación son propiedad de su desarrollador. Queda prohibida su reproducción total o parcial sin autorización expresa y por escrito.
+
+8. CONTACTO
+Para consultas, reclamos o solicitudes de eliminación de datos:
+alangambacorta7@gmail.com`
 
 export default function Login() {
   const { registrar, iniciarSesion, recuperarContrasena, error } = useAuth()
@@ -10,6 +38,7 @@ export default function Login() {
   const [verPass, setVerPass] = useState(false)
   const [cargando, setCargando] = useState(false)
   const [resetEnviado, setResetEnviado] = useState(false)
+  const [verTerminos, setVerTerminos] = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -181,10 +210,45 @@ export default function Login() {
           )}
         </div>
 
-        <p className="text-center text-xs text-slate-600 mt-6">
-          BitácoraAR · Registro de pesca de altura
-        </p>
+        <div className="mt-5 flex flex-col items-center gap-2">
+          <div className="flex items-center gap-3 text-xs text-slate-600">
+            <button onClick={() => setVerTerminos(true)}
+              className="hover:text-cyan-400 transition-colors underline underline-offset-2">
+              Términos y condiciones
+            </button>
+            <span>·</span>
+            <span className="flex items-center gap-1">
+              <span className="text-green-500">✓</span> Registrada en NIC.ar
+            </span>
+          </div>
+          <p className="text-center text-xs text-slate-700">
+            BitácoraAR · Registro de pesca de altura
+          </p>
+        </div>
       </div>
+
+      {verTerminos && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+          onClick={() => setVerTerminos(false)}>
+          <div className="bg-navy-800 border border-navy-600 rounded-2xl w-full max-w-lg shadow-xl flex flex-col max-h-[80vh]"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-navy-700">
+              <h3 className="text-white font-semibold">Términos y condiciones</h3>
+              <button onClick={() => setVerTerminos(false)} className="btn-ghost p-1.5 rounded-lg">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="overflow-y-auto px-6 py-4 text-xs text-slate-400 leading-relaxed whitespace-pre-wrap flex-1">
+              {TERMINOS_TEXTO}
+            </div>
+            <div className="px-6 py-4 border-t border-navy-700">
+              <button onClick={() => setVerTerminos(false)} className="btn-primary w-full">
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
