@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Trash2, ChevronUp, ChevronDown, Search } from 'lucide-react'
+import { Trash2, ChevronUp, ChevronDown, Search, Pencil } from 'lucide-react'
 import { calcularSingladuras } from '../hooks/useViajes'
 
 function fmtFecha(iso) {
@@ -22,7 +22,7 @@ function fmtUSD(n) {
   return `USD ${Math.round(n).toLocaleString('es-AR')}`
 }
 
-export default function HistorialViajes({ viajes, onEliminar, calcularTotalViaje, config }) {
+export default function HistorialViajes({ viajes, onEliminar, onEditar, calcularTotalViaje, config }) {
   const [busqueda, setBusqueda] = useState('')
   const [orden, setOrden] = useState({ col: 'fechaSalida', asc: false })
   const [confirmarId, setConfirmarId] = useState(null)
@@ -196,10 +196,16 @@ export default function HistorialViajes({ viajes, onEliminar, calcularTotalViaje
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <button onClick={() => setConfirmarId(v.id)}
-                        className="btn-danger opacity-0 group-hover:opacity-100" title="Eliminar viaje">
-                        <Trash2 size={15} />
-                      </button>
+                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100">
+                        <button onClick={() => onEditar(v)}
+                          className="btn-ghost p-1.5 rounded-lg" title="Editar viaje">
+                          <Pencil size={14} className="text-cyan-400" />
+                        </button>
+                        <button onClick={() => setConfirmarId(v.id)}
+                          className="btn-danger" title="Eliminar viaje">
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )

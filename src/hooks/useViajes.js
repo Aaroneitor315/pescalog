@@ -53,5 +53,19 @@ export function useViajes(uid) {
     if (viaje) await actualizarStats(viaje.especie, viaje.cajones || 0, 'eliminar')
   }
 
-  return { viajes, agregarViaje, eliminarViaje }
+  async function editarViaje(id, datos) {
+    if (!uid) return
+    const viajeAnterior = viajes.find(v => v.id === id)
+    await setDoc(doc(db, 'usuarios', uid, 'viajes', id), {
+      ...datos,
+      creadoEn: viajeAnterior?.creadoEn || new Date().toISOString(),
+      editadoEn: new Date().toISOString(),
+    })
+    if (viajeAnterior) {
+      await actualizarStats(viajeAnterior.especie, viajeAnterior.cajones || 0, 'eliminar')
+      await actualizarStats(datos.especie, datos.cajones || 0, 'agregar')
+    }
+  }
+
+  return { viajes, agregarViaje, eliminarViaje, editarViaje }
 }

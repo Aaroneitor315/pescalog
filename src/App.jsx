@@ -15,15 +15,26 @@ import { useAuth } from './hooks/useAuth'
 export default function App() {
   const { user, loading, cerrarSesion } = useAuth()
   const [tab, setTab] = useState('dashboard')
+  const [viajeEditando, setViajeEditando] = useState(null)
 
   const uid = user?.uid || null
-  const { viajes, agregarViaje, eliminarViaje } = useViajes(uid)
+  const { viajes, agregarViaje, eliminarViaje, editarViaje } = useViajes(uid)
   const { config, setPrecioEspecie, setTipoCambio, guardarTodos, calcularTotalViaje } = usePrecios(uid)
   const { libreta, actualizarPerfil, actualizarDocumento, agregarDocumento, eliminarDocumento } = useLibreta(uid)
 
   function handleGuardar(datos) {
-    agregarViaje(datos)
+    if (viajeEditando) {
+      editarViaje(viajeEditando.id, datos)
+      setViajeEditando(null)
+    } else {
+      agregarViaje(datos)
+    }
     setTab('historial')
+  }
+
+  function handleEditar(viaje) {
+    setViajeEditando(viaje)
+    setTab('nuevo')
   }
 
   if (loading) {
@@ -59,6 +70,7 @@ export default function App() {
           <HistorialViajes
             viajes={viajes}
             onEliminar={eliminarViaje}
+            onEditar={handleEditar}
             calcularTotalViaje={calcularTotalViaje}
             config={config}
           />
@@ -84,7 +96,8 @@ export default function App() {
         {tab === 'nuevo' && (
           <FormularioViaje
             onGuardar={handleGuardar}
-            onCancelar={() => setTab('dashboard')}
+            onCancelar={() => { setViajeEditando(null); setTab(viajeEditando ? 'historial' : 'dashboard') }}
+            viajeInicial={viajeEditando}
           />
         )}
         {tab === 'admin' && <AdminPanel />}

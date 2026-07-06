@@ -17,8 +17,18 @@ const CAMPOS_INICIALES = {
   observaciones: '',
 }
 
-export default function FormularioViaje({ onGuardar, onCancelar }) {
-  const [form, setForm] = useState(CAMPOS_INICIALES)
+export default function FormularioViaje({ onGuardar, onCancelar, viajeInicial }) {
+  const [form, setForm] = useState(() => {
+    if (!viajeInicial) return CAMPOS_INICIALES
+    const esOtra = !ESPECIES_LISTA.includes(viajeInicial.especie)
+    return {
+      ...CAMPOS_INICIALES,
+      ...viajeInicial,
+      especie: esOtra ? 'otra' : viajeInicial.especie,
+      especieOtra: esOtra ? viajeInicial.especie : '',
+      cajones: String(viajeInicial.cajones || ''),
+    }
+  })
 
   function set(campo, valor) {
     setForm(prev => ({ ...prev, [campo]: valor }))
@@ -47,7 +57,7 @@ export default function FormularioViaje({ onGuardar, onCancelar }) {
     <div className="max-w-2xl mx-auto">
       <div className="card">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-white">Nuevo viaje de pesca</h2>
+          <h2 className="text-xl font-semibold text-white">{viajeInicial ? 'Editar viaje' : 'Nuevo viaje de pesca'}</h2>
           {onCancelar && (
             <button onClick={onCancelar} className="btn-ghost p-2 rounded-lg">
               <X size={18} />
@@ -159,7 +169,7 @@ export default function FormularioViaje({ onGuardar, onCancelar }) {
 
           <div className="flex gap-3 pt-2">
             <button type="submit" className="btn-primary flex items-center gap-2">
-              <Save size={16} /> Guardar viaje
+              <Save size={16} /> {viajeInicial ? 'Guardar cambios' : 'Guardar viaje'}
             </button>
             {onCancelar && (
               <button type="button" onClick={onCancelar} className="btn-ghost">Cancelar</button>
