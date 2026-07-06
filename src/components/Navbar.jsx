@@ -2,7 +2,7 @@ import { LogOut, Shield } from 'lucide-react'
 import { esAdmin } from '../hooks/useAdmin'
 
 const TABS = [
-  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'dashboard', label: 'Estadísticas', main: true },
   { id: 'historial', label: 'Historial' },
   { id: 'libreta', label: 'Mi Libreta' },
   { id: 'precios', label: 'Precios' },
@@ -28,9 +28,23 @@ export default function Navbar({ tab, setTab, user, onCerrarSesion }) {
           </div>
         )}
       </div>
-      <div className="max-w-6xl mx-auto px-4 py-2">
-        <nav className="flex gap-1 overflow-x-auto scrollbar-none justify-center">
-          {TABS.map(t => (
+      <div className="max-w-6xl mx-auto px-4 py-0">
+        <nav className="flex gap-1 overflow-x-auto scrollbar-none justify-center items-end">
+          {TABS.map(t => t.main ? (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className="whitespace-nowrap px-5 py-3 rounded-t-lg font-bold tracking-widest text-sm uppercase transition-colors"
+              style={{
+                background: tab === t.id ? '#0891b2' : '#0a1f35',
+                color: tab === t.id ? '#fff' : '#22d3ee',
+                boxShadow: tab === t.id ? '0 -2px 12px #0891b240' : 'none',
+                marginBottom: 0,
+              }}
+            >
+              {t.label}
+            </button>
+          ) : (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
