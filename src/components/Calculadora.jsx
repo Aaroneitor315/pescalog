@@ -129,8 +129,8 @@ export default function Calculadora({ uid }) {
           <Calculator size={20} className="text-cyan-400" />
         </div>
         <div>
-          <h2 className="text-xl font-semibold text-white">Calculadora de liquidación</h2>
-          <p className="text-xs text-slate-500">Sector máquina · Langostineros</p>
+          <h2 className="text-xl font-semibold text-white">Calculadora</h2>
+          <p className="text-xs text-slate-500">Valores a cargar</p>
         </div>
       </div>
 
