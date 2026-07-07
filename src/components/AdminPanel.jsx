@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAdmin } from '../hooks/useAdmin'
-import { Shield, Users, Package, DollarSign, ToggleLeft, ToggleRight, Save, Star } from 'lucide-react'
+import { useConvenio } from '../hooks/useConvenio'
+import { Shield, Package, ToggleLeft, ToggleRight, Save, Star, FileText } from 'lucide-react'
 
 const ESPECIES = ['langostino', 'calamar', 'merluza', 'abadejo', 'pescado de costa A', 'pescado de costa B']
 
@@ -14,6 +15,27 @@ function fmtNum(n) {
 
 export default function AdminPanel() {
   const { stats, sponsors, guardarSponsors, cargando } = useAdmin()
+  const { convenio, guardarVersion } = useConvenio()
+  const [editConvenio, setEditConvenio] = useState(null)
+  const [guardadoConvenio, setGuardadoConvenio] = useState(false)
+
+  const cv = editConvenio || convenio
+
+  function setCv(campo, valor) {
+    setEditConvenio(prev => ({ ...(prev || convenio), [campo]: valor }))
+    setGuardadoConvenio(false)
+  }
+
+  async function handleGuardarConvenio() {
+    const next = { ...cv }
+    Object.keys(next).forEach(k => {
+      if (k !== 'fecha_vigencia_desde') next[k] = Number(next[k]) || 0
+    })
+    await guardarVersion(next)
+    setEditConvenio(null)
+    setGuardadoConvenio(true)
+    setTimeout(() => setGuardadoConvenio(false), 2000)
+  }
   const [editSponsors, setEditSponsors] = useState(null)
   const [guardado, setGuardado] = useState(false)
 
@@ -211,6 +233,82 @@ export default function AdminPanel() {
         {!editSponsors && (
           <p className="text-xs text-slate-500 mt-4">
             Modificá cualquier campo para habilitar el botón Guardar.
+          </p>
+        )}
+      </div>
+
+      {/* Convenio colectivo */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <FileText size={18} className="text-cyan-400" />
+            <h3 className="text-base font-semibold text-white">Convenio colectivo</h3>
+          </div>
+          {editConvenio && (
+            <button onClick={handleGuardarConvenio}
+              className={`btn-primary flex items-center gap-2 text-sm ${guardadoConvenio ? 'bg-green-500 hover:bg-green-400' : ''}`}>
+              <Save size={14} /> {guardadoConvenio ? '¡Guardado!' : 'Guardar nueva versión'}
+            </button>
+          )}
+        </div>
+
+        <div className="bg-navy-700/50 border border-navy-600 rounded-xl p-4 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label>Vigente desde</label>
+              <input type="date" value={cv.fecha_vigencia_desde}
+                onChange={e => setCv('fecha_vigencia_desde', e.target.value)} />
+            </div>
+            <div>
+              <label>Tope MOPRE ($)</label>
+              <input type="number" min="0" step="0.01" value={cv.tope_mopre}
+                onChange={e => setCv('tope_mopre', e.target.value)} />
+            </div>
+            <div>
+              <label>% Sector máquina</label>
+              <input type="number" min="0" step="0.01" value={cv.porcentaje_maquina}
+                onChange={e => setCv('porcentaje_maquina', e.target.value)} />
+            </div>
+            <div>
+              <label>% Ropa de agua</label>
+              <input type="number" min="0" step="0.01" value={cv.porcentaje_ropa_agua}
+                onChange={e => setCv('porcentaje_ropa_agua', e.target.value)} />
+            </div>
+            <div>
+              <label>Viajes mínimos</label>
+              <input type="number" min="1" step="1" value={cv.viajes_minimos}
+                onChange={e => setCv('viajes_minimos', e.target.value)} />
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-500 uppercase tracking-wider pt-2">Descuentos</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div>
+              <label>% Obra social</label>
+              <input type="number" min="0" step="0.01" value={cv.porcentaje_obra_social}
+                onChange={e => setCv('porcentaje_obra_social', e.target.value)} />
+            </div>
+            <div>
+              <label>% Ley 19032</label>
+              <input type="number" min="0" step="0.01" value={cv.porcentaje_ley_19032}
+                onChange={e => setCv('porcentaje_ley_19032', e.target.value)} />
+            </div>
+            <div>
+              <label>% Jubilación</label>
+              <input type="number" min="0" step="0.01" value={cv.porcentaje_jubilacion}
+                onChange={e => setCv('porcentaje_jubilacion', e.target.value)} />
+            </div>
+            <div>
+              <label>% Sindicato</label>
+              <input type="number" min="0" step="0.01" value={cv.porcentaje_sindicato}
+                onChange={e => setCv('porcentaje_sindicato', e.target.value)} />
+            </div>
+          </div>
+        </div>
+
+        {!editConvenio && (
+          <p className="text-xs text-slate-500 mt-4">
+            Modificá cualquier campo para habilitar el botón Guardar. Cada guardado crea una nueva versión histórica.
           </p>
         )}
       </div>

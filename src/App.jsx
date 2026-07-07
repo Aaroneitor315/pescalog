@@ -7,6 +7,7 @@ import ConfigPrecios from './components/ConfigPrecios'
 import Libreta from './components/Libreta'
 import Login from './components/Login'
 import AdminPanel from './components/AdminPanel'
+import Calculadora from './components/Calculadora'
 import { useViajes } from './hooks/useViajes'
 import { usePrecios } from './hooks/usePrecios'
 import { useLibreta } from './hooks/useLibreta'
@@ -100,6 +101,7 @@ export default function App() {
             viajeInicial={viajeEditando}
           />
         )}
+        {tab === 'liquidacion' && <Calculadora uid={uid} />}
         {tab === 'admin' && <AdminPanel />}
       </main>
     </div>

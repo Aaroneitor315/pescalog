@@ -7,6 +7,7 @@ const TABS = [
   { id: 'libreta', label: 'Mi Libreta' },
   { id: 'precios', label: 'Valores' },
   { id: 'nuevo', label: '+ Nuevo viaje' },
+  { id: 'liquidacion', label: 'Liquidación' },
 ]
 
 export default function Navbar({ tab, setTab, user, onCerrarSesion }) {
