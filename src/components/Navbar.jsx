@@ -5,7 +5,7 @@ const TABS = [
   { id: 'dashboard', label: 'Estadísticas', main: true },
   { id: 'historial', label: 'Historial' },
   { id: 'libreta', label: 'Mi Libreta' },
-  { id: 'precios', label: 'Precios' },
+  { id: 'precios', label: 'Valores' },
   { id: 'nuevo', label: '+ Nuevo viaje' },
 ]
 
