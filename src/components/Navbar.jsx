@@ -28,18 +28,17 @@ export default function Navbar({ tab, setTab, user, onCerrarSesion }) {
           </div>
         )}
       </div>
-      <div className="max-w-6xl mx-auto px-4 py-0">
+      <div className="max-w-6xl mx-auto px-4 py-2">
         <nav className="flex gap-1 overflow-x-auto scrollbar-none justify-center items-end">
           {TABS.map(t => t.main ? (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className="whitespace-nowrap px-5 py-3 rounded-t-lg font-bold tracking-widest text-sm uppercase transition-colors"
+              className="whitespace-nowrap px-4 py-2 rounded-lg font-bold tracking-widest text-xs uppercase transition-colors"
               style={{
-                background: tab === t.id ? '#0891b2' : '#0a1f35',
+                background: tab === t.id ? '#0891b2' : '#0a2540',
                 color: tab === t.id ? '#fff' : '#22d3ee',
-                boxShadow: tab === t.id ? '0 -2px 12px #0891b240' : 'none',
-                marginBottom: 0,
+                border: tab === t.id ? 'none' : '1px solid #22d3ee40',
               }}
             >
               {t.label}
