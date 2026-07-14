@@ -7,6 +7,7 @@ import { TrendingUp, Fish, Package, Award, DollarSign, Banknote, Waves } from 'l
 import { calcularSingladuras } from '../hooks/useViajes'
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+const MESES_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
@@ -18,6 +19,11 @@ function fmtPesos(n) {
 
 function fmtUSD(n) {
   return `USD ${n.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+}
+
+function mesKey(v) {
+  const d = new Date(v.fechaSalida || v.creadoEn)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
 function StatCard({ icon: Icon, label, value, sub, accent, iconBg }) {
@@ -54,11 +60,23 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
   }, [viajes])
 
   const [especieFiltro, setEspecieFiltro] = useState('todas')
+  const [mesFiltro, setMesFiltro] = useState('todos')
 
-  const viajesFiltrados = useMemo(
-    () => especieFiltro === 'todas' ? viajes : viajes.filter(v => v.especie === especieFiltro),
-    [viajes, especieFiltro]
-  )
+  const mesesDisponibles = useMemo(() => {
+    const keys = [...new Set(viajes.map(v => mesKey(v)))].sort().reverse()
+    return keys.map(k => {
+      const [y, m] = k.split('-')
+      return { key: k, label: `${MESES[Number(m) - 1]} ${y.slice(2)}`, labelFull: `${MESES_FULL[Number(m) - 1]} ${y}` }
+    })
+  }, [viajes])
+
+  const viajesFiltrados = useMemo(() => {
+    let lista = especieFiltro === 'todas' ? viajes : viajes.filter(v => v.especie === especieFiltro)
+    if (mesFiltro !== 'todos') lista = lista.filter(v => mesKey(v) === mesFiltro)
+    return lista
+  }, [viajes, especieFiltro, mesFiltro])
+
+  const mesActual = mesesDisponibles.find(m => m.key === mesFiltro)
 
   const stats = useMemo(() => {
     if (!viajesFiltrados.length) return null
@@ -69,7 +87,6 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
     const totalUSD = viajesFiltrados.reduce((s, v) => s + calcularTotalViaje(v).usd, 0)
     const totalSingladuras = viajesFiltrados.reduce((s, v) => s + calcularSingladuras(v.fechaSalida, v.fechaRegreso), 0)
     const totalEmbarcado = viajesFiltrados.reduce((s, v) => s + calcularSingladuras(v.fechaEmbarco, v.fechaDesembarco), 0)
-    // días embarcado por barco (suma de embarco-desembarco agrupado por nombre de barco)
     const embarcadoPorBarco = {}
     viajesFiltrados.forEach(v => {
       const nombre = v.barco?.trim() || '(sin nombre)'
@@ -81,6 +98,19 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
     const barcosUnicos = Object.keys(embarcadoPorBarco).length
     return { total, promedio, mejor, cantidad: viajesFiltrados.length, totalPesos, totalUSD, totalSingladuras, totalEmbarcado, embarcadoPorBarco, barcosUnicos }
   }, [viajesFiltrados, calcularTotalViaje, config])
+
+  const datosComparativa = useMemo(() => {
+    return mesesDisponibles.slice(0, 6).reverse().map(({ key, label }) => {
+      const [y, m] = key.split('-')
+      const cajones = viajes
+        .filter(v => mesKey(v) === key && (especieFiltro === 'todas' || v.especie === especieFiltro))
+        .reduce((s, v) => s + v.cajones, 0)
+      const pesos = viajes
+        .filter(v => mesKey(v) === key && (especieFiltro === 'todas' || v.especie === especieFiltro))
+        .reduce((s, v) => s + calcularTotalViaje(v).ars, 0)
+      return { mes: label, cajones, pesos }
+    })
+  }, [viajes, especieFiltro, calcularTotalViaje])
 
   const datosGrafico = useMemo(() => {
     const ahora = new Date()
@@ -102,8 +132,7 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
   }, [viajesFiltrados])
 
   const maxCajones = Math.max(...datosGrafico.map(d => d.cajones), 1)
-
-  const hayPrecios = Object.values(config.precios).some(p => (p?.ars > 0 || p?.usd > 0))
+  const maxComparativa = Math.max(...datosComparativa.map(d => d.cajones), 1)
 
   if (!viajes.length) {
     return (
@@ -116,55 +145,42 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <h2 className="text-xl font-semibold text-white">Dashboard</h2>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-400">Filtrar por especie:</span>
-          <select
-            className="w-44 text-sm py-1.5"
-            value={especieFiltro}
-            onChange={e => setEspecieFiltro(e.target.value)}
-          >
-            {especies.map(e => (
-              <option key={e} value={e}>{e === 'todas' ? 'Todas las especies' : capitalize(e)}</option>
-            ))}
-          </select>
-        </div>
+        <h2 className="text-xl font-semibold text-white">
+          {mesActual ? mesActual.labelFull : 'Todos los períodos'}
+        </h2>
+        <select className="w-44 text-sm py-1.5" value={especieFiltro} onChange={e => setEspecieFiltro(e.target.value)}>
+          {especies.map(e => (
+            <option key={e} value={e}>{e === 'todas' ? 'Todas las especies' : capitalize(e)}</option>
+          ))}
+        </select>
       </div>
 
-      {/* Stats cajones */}
+      {/* Pills de meses */}
+      <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
+        <button
+          onClick={() => setMesFiltro('todos')}
+          className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${mesFiltro === 'todos' ? 'bg-cyan-500 text-navy-900' : 'bg-navy-700/60 text-slate-400 border border-navy-600 hover:border-cyan-500/40'}`}>
+          Todo
+        </button>
+        {mesesDisponibles.map(m => (
+          <button key={m.key} onClick={() => setMesFiltro(m.key)}
+            className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${mesFiltro === m.key ? 'bg-cyan-500 text-navy-900' : 'bg-navy-700/60 text-slate-400 border border-navy-600 hover:border-cyan-500/40'}`}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+
       {stats ? (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard
-              icon={Package}
-              label="Total cajones"
-              value={stats.total.toLocaleString('es-AR')}
-              sub={`${stats.cantidad} viaje${stats.cantidad !== 1 ? 's' : ''}`}
-            />
-            <StatCard
-              icon={TrendingUp}
-              label="Promedio por viaje"
-              value={stats.promedio.toLocaleString('es-AR')}
-              sub="cajones"
-            />
-            <StatCard
-              icon={Award}
-              label="Mejor viaje"
-              value={stats.mejor.cajones.toLocaleString('es-AR')}
-              sub={stats.mejor.barco}
-              accent="text-yellow-400"
-            />
-            <StatCard
-              icon={Fish}
-              label="Viajes registrados"
-              value={stats.cantidad}
-              sub={especieFiltro !== 'todas' ? capitalize(especieFiltro) : 'todas las especies'}
-            />
+            <StatCard icon={Package} label="Total cajones" value={stats.total.toLocaleString('es-AR')} sub={`${stats.cantidad} viaje${stats.cantidad !== 1 ? 's' : ''}`} />
+            <StatCard icon={TrendingUp} label="Promedio por viaje" value={stats.promedio.toLocaleString('es-AR')} sub="cajones" />
+            <StatCard icon={Award} label="Mejor viaje" value={stats.mejor.cajones.toLocaleString('es-AR')} sub={stats.mejor.barco} accent="text-yellow-400" />
+            <StatCard icon={Fish} label="Viajes registrados" value={stats.cantidad} sub={especieFiltro !== 'todas' ? capitalize(especieFiltro) : 'todas las especies'} />
           </div>
 
-          {/* Stats financieras — siempre visibles */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="card border-l-4 border-l-green-500" style={{borderRadius: '0 12px 12px 0'}}>
+            <div className="card border-l-4 border-l-green-500" style={{borderRadius:'0 12px 12px 0'}}>
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Total facturado (ARS)</p>
@@ -172,23 +188,13 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
                     {stats.totalPesos > 0 ? fmtPesos(stats.totalPesos) : <span className="text-slate-600 text-xl">Configurar precios</span>}
                   </p>
                   {stats.cantidad > 1 && stats.totalPesos > 0 && (
-                    <p className="text-xs text-slate-500 mt-1">
-                      Prom. {fmtPesos(stats.totalPesos / stats.cantidad)} / viaje
-                    </p>
-                  )}
-                  {stats.totalPesos === 0 && (
-                    <p className="text-xs text-slate-600 mt-1">
-                      Ingresá precios en la pestaña <span className="text-cyan-400">Precios</span>
-                    </p>
+                    <p className="text-xs text-slate-500 mt-1">Prom. {fmtPesos(stats.totalPesos / stats.cantidad)} / viaje</p>
                   )}
                 </div>
-                <div className="bg-green-900/30 p-2 rounded-lg">
-                  <Banknote size={20} className="text-green-400" />
-                </div>
+                <div className="bg-green-900/30 p-2 rounded-lg"><Banknote size={20} className="text-green-400" /></div>
               </div>
             </div>
-
-            <div className="card border-l-4 border-l-blue-400" style={{borderRadius: '0 12px 12px 0'}}>
+            <div className="card border-l-4 border-l-blue-400" style={{borderRadius:'0 12px 12px 0'}}>
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Total facturado (USD)</p>
@@ -196,21 +202,16 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
                     {stats.totalUSD > 0 ? fmtUSD(stats.totalUSD) : <span className="text-slate-600 text-xl">Configurar precios</span>}
                   </p>
                   {stats.cantidad > 1 && stats.totalUSD > 0 && (
-                    <p className="text-xs text-slate-500 mt-1">
-                      Prom. {fmtUSD(stats.totalUSD / stats.cantidad)} / viaje
-                    </p>
+                    <p className="text-xs text-slate-500 mt-1">Prom. {fmtUSD(stats.totalUSD / stats.cantidad)} / viaje</p>
                   )}
                 </div>
-                <div className="bg-blue-900/30 p-2 rounded-lg">
-                  <DollarSign size={20} className="text-blue-400" />
-                </div>
+                <div className="bg-blue-900/30 p-2 rounded-lg"><DollarSign size={20} className="text-blue-400" /></div>
               </div>
             </div>
           </div>
 
-          {/* Singladuras y días embarcado — compactos */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="card" style={{padding: '10px 14px'}}>
+            <div className="card" style={{padding:'10px 14px'}}>
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-wider" style={{fontSize:'10px'}}>Total singladuras</p>
@@ -220,7 +221,7 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
                 <Waves size={16} className="text-slate-600 mt-1" />
               </div>
             </div>
-            <div className="card" style={{padding: '10px 14px'}}>
+            <div className="card" style={{padding:'10px 14px'}}>
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-wider" style={{fontSize:'10px'}}>Días embarcado</p>
@@ -232,7 +233,6 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
             </div>
           </div>
 
-          {/* Días embarcado por barco */}
           {stats.totalEmbarcado > 0 && (() => {
             const lista = Object.entries(stats.embarcadoPorBarco).sort((a, b) => b[1].dias - a[1].dias)
             const maxDias = lista[0]?.[1].dias || 1
@@ -254,87 +254,85 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
               </div>
             )
           })()}
+
+          {/* Comparativa mensual — solo visible en vista "todos" */}
+          {mesFiltro === 'todos' && datosComparativa.some(d => d.cajones > 0) && (
+            <div className="card">
+              <h3 className="text-sm font-semibold text-white mb-4">Comparativa mensual</h3>
+              <div className="space-y-3">
+                {datosComparativa.map(d => (
+                  <div key={d.mes} className="flex items-center gap-3">
+                    <span className="text-xs text-slate-500 w-12 shrink-0">{d.mes}</span>
+                    <div className="flex-1 h-2 bg-navy-700 rounded-full overflow-hidden">
+                      <div className="h-full bg-cyan-500/80 rounded-full transition-all"
+                        style={{ width: `${(d.cajones / maxComparativa) * 100}%` }} />
+                    </div>
+                    <span className="text-xs text-slate-400 w-24 text-right shrink-0 font-mono">
+                      {d.cajones.toLocaleString('es-AR')} caj.
+                    </span>
+                    {d.pesos > 0 && (
+                      <span className="text-xs text-green-400 w-28 text-right shrink-0 hidden sm:block">
+                        {fmtPesos(d.pesos)}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       ) : (
         <div className="card text-center py-10 text-slate-500">
-          No hay viajes con ese filtro.
+          No hay viajes en este período.
         </div>
       )}
 
-      {/* Gráfico */}
+      {/* Gráfico cajones 12 meses */}
       <div className="card">
         <h3 className="text-base font-semibold text-white mb-6">
           Cajones por mes — últimos 12 meses
-          {especieFiltro !== 'todas' && (
-            <span className="text-cyan-400 font-normal ml-2">({capitalize(especieFiltro)})</span>
-          )}
+          {especieFiltro !== 'todas' && <span className="text-cyan-400 font-normal ml-2">({capitalize(especieFiltro)})</span>}
         </h3>
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={datosGrafico} barSize={28} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#163058" vertical={false} />
-            <XAxis
-              dataKey="mes"
-              tick={{ fill: '#94a3b8', fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              tick={{ fill: '#94a3b8', fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-              width={48}
-              tickFormatter={v => v === 0 ? '0' : v >= 1000 ? `${(v/1000).toFixed(1)}k` : v}
-            />
+            <XAxis dataKey="mes" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} width={48}
+              tickFormatter={v => v === 0 ? '0' : v >= 1000 ? `${(v/1000).toFixed(1)}k` : v} />
             <Tooltip content={<CustomTooltip />} cursor={{ fill: '#163058' }} />
             <Bar dataKey="cajones" radius={[4, 4, 0, 0]}>
               {datosGrafico.map((entry, i) => (
-                <Cell
-                  key={i}
-                  fill={entry.cajones === maxCajones && entry.cajones > 0 ? '#22d3ee' : '#0891b2'}
-                  opacity={entry.cajones === 0 ? 0.2 : 1}
-                />
+                <Cell key={i} fill={entry.cajones === maxCajones && entry.cajones > 0 ? '#22d3ee' : '#0891b2'} opacity={entry.cajones === 0 ? 0.2 : 1} />
               ))}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
-        <p className="text-xs text-slate-600 mt-2 text-right">
-          La barra más alta está resaltada en cyan
-        </p>
+        <p className="text-xs text-slate-600 mt-2 text-right">La barra más alta está resaltada en cyan</p>
       </div>
 
-      {/* Top especies */}
       {especieFiltro === 'todas' && (
         <div className="card">
           <h3 className="text-base font-semibold text-white mb-4">Cajones por especie</h3>
           <div className="space-y-3">
             {(() => {
               const por = {}
-              viajes.forEach(v => { por[v.especie] = (por[v.especie] || 0) + v.cajones })
+              viajesFiltrados.forEach(v => { por[v.especie] = (por[v.especie] || 0) + v.cajones })
               const total = Object.values(por).reduce((s, n) => s + n, 0)
-              return Object.entries(por)
-                .sort((a, b) => b[1] - a[1])
-                .map(([esp, n]) => (
-                  <div key={esp}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-slate-300">{capitalize(esp)}</span>
-                      <div className="flex gap-3">
-                        {(config.precios[esp]?.usd > 0) && (
-                          <span className="text-blue-400 text-xs">{fmtUSD(n * config.precios[esp].usd)}</span>
-                        )}
-                        {(config.precios[esp]?.ars > 0) && (
-                          <span className="text-green-400 text-xs">{fmtPesos(n * config.precios[esp].ars)}</span>
-                        )}
-                        <span className="text-white font-medium">{n.toLocaleString('es-AR')} caj.</span>
-                      </div>
-                    </div>
-                    <div className="h-2 bg-navy-700 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-full transition-all"
-                        style={{ width: `${(n / total) * 100}%` }}
-                      />
+              return Object.entries(por).sort((a, b) => b[1] - a[1]).map(([esp, n]) => (
+                <div key={esp}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-slate-300">{capitalize(esp)}</span>
+                    <div className="flex gap-3">
+                      {config.precios[esp]?.usd > 0 && <span className="text-blue-400 text-xs">{fmtUSD(n * config.precios[esp].usd)}</span>}
+                      {config.precios[esp]?.ars > 0 && <span className="text-green-400 text-xs">{fmtPesos(n * config.precios[esp].ars)}</span>}
+                      <span className="text-white font-medium">{n.toLocaleString('es-AR')} caj.</span>
                     </div>
                   </div>
-                ))
+                  <div className="h-2 bg-navy-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-full transition-all" style={{ width: `${(n / total) * 100}%` }} />
+                  </div>
+                </div>
+              ))
             })()}
           </div>
         </div>
