@@ -53,7 +53,7 @@ export default function App() {
   return (
     <div className="min-h-screen">
       <Navbar tab={tab} setTab={setTab} user={user} onCerrarSesion={cerrarSesion} />
-      <main className="max-w-6xl mx-auto px-4 py-8 relative">
+      <main className="max-w-6xl mx-auto px-4 pt-8 pb-24 sm:py-8 relative">
         <img
           src="/logo.png"
           alt=""
