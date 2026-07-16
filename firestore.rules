@@ -2,27 +2,26 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Datos por usuario: solo el propio usuario puede leer/escribir
-    match /usuarios/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'alangambacorta7@gmail.com';
     }
 
-    // Stats globales: todos los usuarios autenticados pueden escribir (incrementos al guardar viaje)
-    // Solo el admin puede leer directamente (el panel admin usa onSnapshot)
+    // Datos por usuario: el propio usuario o el admin pueden leer
+    match /usuarios/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if isAdmin();
+    }
+
+    // Stats globales: todos los autenticados pueden escribir, solo admin lee
     match /stats/{document} {
-      allow read: if request.auth != null && request.auth.token.email == 'alangambacorta7@gmail.com';
+      allow read: if isAdmin();
       allow write: if request.auth != null;
     }
 
-    // Config global (sponsors, convenio, etc): todos pueden leer, solo admin puede escribir
+    // Config global: todos pueden leer, solo admin escribe
     match /config/{document} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.token.email == 'alangambacorta7@gmail.com';
-    }
-
-    // Liquidaciones por usuario
-    match /usuarios/{userId}/liquidaciones/{document} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow write: if isAdmin();
     }
   }
 }

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useAdmin } from '../hooks/useAdmin'
 import { useConvenio } from '../hooks/useConvenio'
-import { Shield, Package, ToggleLeft, ToggleRight, Save, Star, FileText } from 'lucide-react'
+import { useAdminUsuarios } from '../hooks/useAdminUsuarios'
+import { Shield, Package, ToggleLeft, ToggleRight, Save, Star, FileText, Users, RefreshCw } from 'lucide-react'
 
 const ESPECIES = ['langostino', 'calamar', 'merluza', 'abadejo', 'pescado de costa A', 'pescado de costa B']
 
@@ -13,9 +14,15 @@ function fmtNum(n) {
   return (n || 0).toLocaleString('es-AR')
 }
 
+function fmtFechaCorta(date) {
+  if (!date) return '—'
+  return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
 export default function AdminPanel() {
   const { stats, sponsors, guardarSponsors, cargando } = useAdmin()
   const { convenio, guardarVersion } = useConvenio()
+  const { usuarios, cargando: cargandoUsuarios } = useAdminUsuarios()
   const [editConvenio, setEditConvenio] = useState(null)
   const [guardadoConvenio, setGuardadoConvenio] = useState(false)
 
@@ -311,6 +318,74 @@ export default function AdminPanel() {
             Modificá cualquier campo para habilitar el botón Guardar. Cada guardado crea una nueva versión histórica.
           </p>
         )}
+      </div>
+
+      {/* Usuarios registrados */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <Users size={18} className="text-cyan-400" />
+            <h3 className="text-base font-semibold text-white">Usuarios registrados</h3>
+          </div>
+          {cargandoUsuarios && <RefreshCw size={14} className="text-slate-500 animate-spin" />}
+        </div>
+
+        {cargandoUsuarios ? (
+          <p className="text-slate-500 text-sm text-center py-6 animate-pulse">Cargando usuarios...</p>
+        ) : usuarios.length === 0 ? (
+          <p className="text-slate-500 text-sm text-center py-6">No hay usuarios registrados aún.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-navy-700">
+                  <th className="text-left text-xs text-slate-400 uppercase tracking-wider pb-3 pr-4">Email</th>
+                  <th className="text-right text-xs text-slate-400 uppercase tracking-wider pb-3 px-4">Viajes</th>
+                  <th className="text-right text-xs text-slate-400 uppercase tracking-wider pb-3 px-4">Cajones</th>
+                  <th className="text-right text-xs text-slate-400 uppercase tracking-wider pb-3 px-4">Registrado</th>
+                  <th className="text-right text-xs text-slate-400 uppercase tracking-wider pb-3 pl-4">Último acceso</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-navy-700">
+                {usuarios.map(u => (
+                  <tr key={u.uid} className="hover:bg-navy-700/30 transition-colors">
+                    <td className="py-3 pr-4">
+                      <span className={`text-sm font-medium ${u.email === 'alangambacorta7@gmail.com' ? 'text-yellow-400' : 'text-slate-300'}`}>
+                        {u.email}
+                        {u.email === 'alangambacorta7@gmail.com' && (
+                          <span className="ml-2 text-xs bg-yellow-500/15 text-yellow-400 border border-yellow-500/20 px-2 py-0.5 rounded-full">admin</span>
+                        )}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <span className="text-cyan-400 font-semibold">{u.totalViajes}</span>
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <span className="text-white font-semibold">{u.totalCajones.toLocaleString('es-AR')}</span>
+                    </td>
+                    <td className="py-3 px-4 text-right text-xs text-slate-500">{fmtFechaCorta(u.registradoEn)}</td>
+                    <td className="py-3 pl-4 text-right text-xs text-slate-400">{fmtFechaCorta(u.ultimoAcceso)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-navy-600">
+                  <td className="pt-3 text-xs text-slate-500">{usuarios.length} usuarios en total</td>
+                  <td className="pt-3 px-4 text-right text-cyan-400 font-semibold text-sm">
+                    {usuarios.reduce((s, u) => s + u.totalViajes, 0)}
+                  </td>
+                  <td className="pt-3 px-4 text-right text-white font-semibold text-sm">
+                    {usuarios.reduce((s, u) => s + u.totalCajones, 0).toLocaleString('es-AR')}
+                  </td>
+                  <td colSpan={2} />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+        <p className="text-xs text-slate-600 mt-4">
+          Los usuarios sin email visible aún no iniciaron sesión con la versión actualizada.
+        </p>
       </div>
     </div>
   )

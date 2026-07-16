@@ -6,7 +6,8 @@ import {
   onAuthStateChanged,
   sendPasswordResetEmail,
 } from 'firebase/auth'
-import { auth } from '../firebase'
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { auth, db } from '../firebase'
 
 export function useAuth() {
   const [user, setUser] = useState(null)
@@ -24,7 +25,12 @@ export function useAuth() {
   async function registrar(email, password) {
     setError('')
     try {
-      await createUserWithEmailAndPassword(auth, email, password)
+      const cred = await createUserWithEmailAndPassword(auth, email, password)
+      await setDoc(doc(db, 'usuarios', cred.user.uid, 'perfil', 'datos'), {
+        email,
+        registradoEn: serverTimestamp(),
+        ultimoAcceso: serverTimestamp(),
+      })
     } catch (e) {
       setError(traducirError(e.code))
     }
@@ -33,7 +39,11 @@ export function useAuth() {
   async function iniciarSesion(email, password) {
     setError('')
     try {
-      await signInWithEmailAndPassword(auth, email, password)
+      const cred = await signInWithEmailAndPassword(auth, email, password)
+      await setDoc(doc(db, 'usuarios', cred.user.uid, 'perfil', 'datos'), {
+        email,
+        ultimoAcceso: serverTimestamp(),
+      }, { merge: true })
     } catch (e) {
       setError(traducirError(e.code))
     }
