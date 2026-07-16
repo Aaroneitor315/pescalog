@@ -4,12 +4,6 @@ import { useConvenio } from '../hooks/useConvenio'
 import { useAdminUsuarios } from '../hooks/useAdminUsuarios'
 import { Shield, Package, ToggleLeft, ToggleRight, Save, Star, FileText, Users, RefreshCw } from 'lucide-react'
 
-const ESPECIES = ['langostino', 'calamar', 'merluza', 'abadejo', 'pescado de costa A', 'pescado de costa B']
-
-function capitalize(s) {
-  return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
-}
-
 function fmtNum(n) {
   return (n || 0).toLocaleString('es-AR')
 }
@@ -73,9 +67,6 @@ export default function AdminPanel() {
     setTimeout(() => setGuardado(false), 2000)
   }
 
-  const cajones = stats?.cajonesPorEspecie || {}
-  const maxCajones = Math.max(...ESPECIES.map(e => cajones[e.replace(/\s/g, '_')] || 0), 1)
-
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
@@ -124,31 +115,6 @@ export default function AdminPanel() {
         </div>
       </div>
 
-      {/* Cajones por especie */}
-      <div className="card">
-        <h3 className="text-base font-semibold text-white mb-4">Cajones por especie</h3>
-        <div className="space-y-3">
-          {ESPECIES.map(esp => {
-            const key = esp.replace(/\s/g, '_')
-            const n = cajones[key] || 0
-            return (
-              <div key={esp} className="flex items-center gap-3">
-                <span className="text-sm text-slate-300 w-36 shrink-0">{capitalize(esp)}</span>
-                <div className="flex-1 h-2 bg-navy-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-cyan-500 rounded-full transition-all"
-                    style={{ width: `${(n / maxCajones) * 100}%` }} />
-                </div>
-                <span className="text-sm text-slate-400 w-24 text-right shrink-0">{fmtNum(n)} caj.</span>
-              </div>
-            )
-          })}
-          {!stats && !cargando && (
-            <p className="text-slate-500 text-sm text-center py-4">
-              Las estadísticas se irán acumulando con los viajes que carguen los usuarios.
-            </p>
-          )}
-        </div>
-      </div>
 
       {/* Gestión sponsors */}
       <div className="card">
