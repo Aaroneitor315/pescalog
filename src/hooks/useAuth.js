@@ -26,7 +26,7 @@ export function useAuth() {
     setError('')
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password)
-      await setDoc(doc(db, 'usuarios', cred.user.uid, 'perfil', 'datos'), {
+      await setDoc(doc(db, 'usuarios', cred.user.uid), {
         email,
         registradoEn: serverTimestamp(),
         ultimoAcceso: serverTimestamp(),
@@ -40,7 +40,7 @@ export function useAuth() {
     setError('')
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password)
-      await setDoc(doc(db, 'usuarios', cred.user.uid, 'perfil', 'datos'), {
+      await setDoc(doc(db, 'usuarios', cred.user.uid), {
         email,
         ultimoAcceso: serverTimestamp(),
       }, { merge: true })

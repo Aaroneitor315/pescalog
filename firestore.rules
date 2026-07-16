@@ -7,6 +7,10 @@ service cloud.firestore {
     }
 
     // Datos por usuario: el propio usuario o el admin pueden leer
+    match /usuarios/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isAdmin();
+    }
     match /usuarios/{userId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
       allow read: if isAdmin();

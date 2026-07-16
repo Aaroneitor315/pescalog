@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { collection, getDocs } from 'firebase/firestore'
+import { collection, getDocs, collectionGroup } from 'firebase/firestore'
 import { db } from '../firebase'
 
 export function useAdminUsuarios() {
@@ -9,30 +9,35 @@ export function useAdminUsuarios() {
   useEffect(() => {
     async function cargar() {
       try {
-        const usuariosSnap = await getDocs(collection(db, 'usuarios'))
-        const lista = []
+        // Obtener todos los viajes de todos los usuarios via collectionGroup
+        const [usuariosSnap, todosViajesSnap] = await Promise.all([
+          getDocs(collection(db, 'usuarios')),
+          getDocs(collectionGroup(db, 'viajes')),
+        ])
 
-        for (const usuarioDoc of usuariosSnap.docs) {
+        // Agrupar viajes por uid
+        const viajesPorUid = {}
+        todosViajesSnap.docs.forEach(d => {
+          const uid = d.ref.parent.parent.id
+          if (!viajesPorUid[uid]) viajesPorUid[uid] = []
+          viajesPorUid[uid].push(d.data())
+        })
+
+        const lista = usuariosSnap.docs.map(usuarioDoc => {
           const uid = usuarioDoc.id
-
-          const [perfilSnap, viajesSnap] = await Promise.all([
-            getDocs(collection(db, 'usuarios', uid, 'perfil')),
-            getDocs(collection(db, 'usuarios', uid, 'viajes')),
-          ])
-
-          const perfil = perfilSnap.docs.find(d => d.id === 'datos')?.data() || {}
-          const viajes = viajesSnap.docs.map(d => d.data())
+          const datos = usuarioDoc.data()
+          const viajes = viajesPorUid[uid] || []
           const totalCajones = viajes.reduce((s, v) => s + (Number(v.cajones) || 0), 0)
 
-          lista.push({
+          return {
             uid,
-            email: perfil.email || '(sin email)',
-            registradoEn: perfil.registradoEn?.toDate?.() || null,
-            ultimoAcceso: perfil.ultimoAcceso?.toDate?.() || null,
+            email: datos.email || '(sin email)',
+            registradoEn: datos.registradoEn?.toDate?.() || null,
+            ultimoAcceso: datos.ultimoAcceso?.toDate?.() || null,
             totalViajes: viajes.length,
             totalCajones,
-          })
-        }
+          }
+        })
 
         lista.sort((a, b) => (b.ultimoAcceso || 0) - (a.ultimoAcceso || 0))
         setUsuarios(lista)
