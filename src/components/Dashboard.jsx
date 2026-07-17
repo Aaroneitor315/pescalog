@@ -3,7 +3,7 @@ import Sponsors from './Sponsors'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
-import { TrendingUp, Fish, Package, Award, DollarSign, Banknote, Waves } from 'lucide-react'
+import { TrendingUp, Fish, Package, Award, DollarSign, Banknote, Waves, Eye, EyeOff } from 'lucide-react'
 import { calcularSingladuras } from '../hooks/useViajes'
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
@@ -61,6 +61,17 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
 
   const [especieFiltro, setEspecieFiltro] = useState('todas')
   const [mesFiltro, setMesFiltro] = useState('todos')
+  const [ocultarMontos, setOcultarMontos] = useState(() => localStorage.getItem('ocultarMontos') === 'true')
+
+  function toggleOcultarMontos() {
+    setOcultarMontos(prev => {
+      const next = !prev
+      localStorage.setItem('ocultarMontos', next)
+      return next
+    })
+  }
+
+  const monto = (txt) => ocultarMontos ? '••••••' : txt
 
   const mesesDisponibles = useMemo(() => {
     const keys = [...new Set(viajes.map(v => mesKey(v)))].sort().reverse()
@@ -145,9 +156,15 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <h2 className="text-xl font-semibold text-white">
-          {mesActual ? mesActual.labelFull : 'Todos los períodos'}
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-semibold text-white">
+            {mesActual ? mesActual.labelFull : 'Todos los períodos'}
+          </h2>
+          <button onClick={toggleOcultarMontos} title={ocultarMontos ? 'Mostrar montos' : 'Ocultar montos'}
+            className="text-slate-500 hover:text-slate-300 transition-colors">
+            {ocultarMontos ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
         <select className="w-44 text-sm py-1.5" value={especieFiltro} onChange={e => setEspecieFiltro(e.target.value)}>
           {especies.map(e => (
             <option key={e} value={e}>{e === 'todas' ? 'Todas las especies' : capitalize(e)}</option>
@@ -185,10 +202,10 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Total facturado (ARS)</p>
                   <p className="text-3xl font-bold mt-1 text-green-400">
-                    {stats.totalPesos > 0 ? fmtPesos(stats.totalPesos) : <span className="text-slate-600 text-xl">Configurar precios</span>}
+                    {stats.totalPesos > 0 ? monto(fmtPesos(stats.totalPesos)) : <span className="text-slate-600 text-xl">Configurar precios</span>}
                   </p>
                   {stats.cantidad > 1 && stats.totalPesos > 0 && (
-                    <p className="text-xs text-slate-500 mt-1">Prom. {fmtPesos(stats.totalPesos / stats.cantidad)} / viaje</p>
+                    <p className="text-xs text-slate-500 mt-1">Prom. {monto(fmtPesos(stats.totalPesos / stats.cantidad))} / viaje</p>
                   )}
                 </div>
                 <div className="bg-green-900/30 p-2 rounded-lg"><Banknote size={20} className="text-green-400" /></div>
@@ -199,10 +216,10 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Total facturado (USD)</p>
                   <p className="text-3xl font-bold mt-1 text-blue-400">
-                    {stats.totalUSD > 0 ? fmtUSD(stats.totalUSD) : <span className="text-slate-600 text-xl">Configurar precios</span>}
+                    {stats.totalUSD > 0 ? monto(fmtUSD(stats.totalUSD)) : <span className="text-slate-600 text-xl">Configurar precios</span>}
                   </p>
                   {stats.cantidad > 1 && stats.totalUSD > 0 && (
-                    <p className="text-xs text-slate-500 mt-1">Prom. {fmtUSD(stats.totalUSD / stats.cantidad)} / viaje</p>
+                    <p className="text-xs text-slate-500 mt-1">Prom. {monto(fmtUSD(stats.totalUSD / stats.cantidad))} / viaje</p>
                   )}
                 </div>
                 <div className="bg-blue-900/30 p-2 rounded-lg"><DollarSign size={20} className="text-blue-400" /></div>
@@ -272,7 +289,7 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
                     </span>
                     {d.pesos > 0 && (
                       <span className="text-xs text-green-400 w-28 text-right shrink-0 hidden sm:block">
-                        {fmtPesos(d.pesos)}
+                        {monto(fmtPesos(d.pesos))}
                       </span>
                     )}
                   </div>
@@ -323,8 +340,8 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-slate-300">{capitalize(esp)}</span>
                     <div className="flex gap-3">
-                      {config.precios[esp]?.usd > 0 && <span className="text-blue-400 text-xs">{fmtUSD(n * config.precios[esp].usd)}</span>}
-                      {config.precios[esp]?.ars > 0 && <span className="text-green-400 text-xs">{fmtPesos(n * config.precios[esp].ars)}</span>}
+                      {config.precios[esp]?.usd > 0 && <span className="text-blue-400 text-xs">{monto(fmtUSD(n * config.precios[esp].usd))}</span>}
+                      {config.precios[esp]?.ars > 0 && <span className="text-green-400 text-xs">{monto(fmtPesos(n * config.precios[esp].ars))}</span>}
                       <span className="text-white font-medium">{n.toLocaleString('es-AR')} caj.</span>
                     </div>
                   </div>
