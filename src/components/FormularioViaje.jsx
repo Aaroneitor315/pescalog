@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Save, X, ChevronDown, ChevronUp, Copy } from 'lucide-react'
+import { Save, X, ChevronDown, ChevronUp, Anchor } from 'lucide-react'
 import { calcularSingladuras } from '../hooks/useViajes'
 import { ESPECIES_LISTA } from '../hooks/usePrecios'
 
@@ -18,9 +18,7 @@ const CAMPOS_INICIALES = {
 }
 
 function getBarcosRecientes() {
-  try {
-    return JSON.parse(localStorage.getItem('barcosRecientes') || '[]')
-  } catch { return [] }
+  try { return JSON.parse(localStorage.getItem('barcosRecientes') || '[]') } catch { return [] }
 }
 
 function guardarBarcoReciente(barco) {
@@ -29,7 +27,16 @@ function guardarBarcoReciente(barco) {
   localStorage.setItem('barcosRecientes', JSON.stringify([barco.trim(), ...lista].slice(0, 5)))
 }
 
-export default function FormularioViaje({ onGuardar, onCancelar, viajeInicial }) {
+// Busca la fecha de embarco más reciente para un barco en el historial de viajes
+function buscarEmbarcoAnterior(viajes, barco) {
+  if (!barco || !viajes?.length) return ''
+  const viajesBarco = viajes
+    .filter(v => v.barco?.toLowerCase() === barco.toLowerCase() && v.fechaEmbarco)
+    .sort((a, b) => (b.fechaSalida || '').localeCompare(a.fechaSalida || ''))
+  return viajesBarco[0]?.fechaEmbarco || ''
+}
+
+export default function FormularioViaje({ onGuardar, onCancelar, viajeInicial, viajes = [] }) {
   const [form, setForm] = useState(() => {
     if (!viajeInicial) return CAMPOS_INICIALES
     const esOtra = !ESPECIES_LISTA.includes(viajeInicial.especie)
@@ -42,52 +49,32 @@ export default function FormularioViaje({ onGuardar, onCancelar, viajeInicial })
     }
   })
 
-  const [igualarFechas, setIgualarFechas] = useState(true)
+  const [ultimoViaje, setUltimoViaje] = useState(false)
   const [detallesAbiertos, setDetallesAbiertos] = useState(false)
-  const [barcosRecientes, setBarcosRecientes] = useState(getBarcosRecientes)
   const [barcoCustom, setBarcoCustom] = useState(false)
-
-  useEffect(() => {
-    if (viajeInicial) {
-      const tieneEmbarco = viajeInicial.fechaEmbarco && viajeInicial.fechaEmbarco !== viajeInicial.fechaSalida
-      const tieneDesembarco = viajeInicial.fechaDesembarco && viajeInicial.fechaDesembarco !== viajeInicial.fechaRegreso
-      setIgualarFechas(!tieneEmbarco && !tieneDesembarco)
-    }
-  }, [])
+  const [barcosRecientes, setBarcosRecientes] = useState(getBarcosRecientes)
+  const [embarcoAutofill, setEmbarcoAutofill] = useState('')
 
   function set(campo, valor) {
-    setForm(prev => {
-      const next = { ...prev, [campo]: valor }
-      if (igualarFechas) {
-        if (campo === 'fechaSalida') next.fechaEmbarco = valor
-        if (campo === 'fechaRegreso') next.fechaDesembarco = valor
-      }
-      return next
-    })
-  }
-
-  function toggleIgualar(val) {
-    setIgualarFechas(val)
-    if (val) {
-      setForm(prev => ({
-        ...prev,
-        fechaEmbarco: prev.fechaSalida,
-        fechaDesembarco: prev.fechaRegreso,
-      }))
-    }
-  }
-
-  function copiarSalida() {
-    setForm(prev => ({ ...prev, fechaEmbarco: prev.fechaSalida }))
-  }
-
-  function copiarRegreso() {
-    setForm(prev => ({ ...prev, fechaDesembarco: prev.fechaRegreso }))
+    setForm(prev => ({ ...prev, [campo]: valor }))
   }
 
   function seleccionarBarco(nombre) {
     setForm(prev => ({ ...prev, barco: nombre }))
     setBarcoCustom(false)
+    const embarco = buscarEmbarcoAnterior(viajes, nombre)
+    setEmbarcoAutofill(embarco)
+    setForm(prev => ({ ...prev, barco: nombre, fechaEmbarco: embarco, fechaDesembarco: '' }))
+    setUltimoViaje(false)
+  }
+
+  function handleBarcoInput(nombre) {
+    setForm(prev => ({ ...prev, barco: nombre }))
+    if (nombre.length > 1) {
+      const embarco = buscarEmbarcoAnterior(viajes, nombre)
+      setEmbarcoAutofill(embarco)
+      if (embarco) setForm(prev => ({ ...prev, barco: nombre, fechaEmbarco: embarco }))
+    }
   }
 
   function handleSubmit(e) {
@@ -98,7 +85,7 @@ export default function FormularioViaje({ onGuardar, onCancelar, viajeInicial })
       fechaSalida: form.fechaSalida,
       fechaRegreso: form.fechaRegreso,
       fechaEmbarco: form.fechaEmbarco,
-      fechaDesembarco: form.fechaDesembarco,
+      fechaDesembarco: ultimoViaje ? form.fechaDesembarco : '',
       barco: form.barco.trim(),
       puertoPartida: form.puertoPartida.trim(),
       puertoLlegada: form.puertoLlegada.trim(),
@@ -111,6 +98,7 @@ export default function FormularioViaje({ onGuardar, onCancelar, viajeInicial })
 
   const singladuras = calcularSingladuras(form.fechaSalida, form.fechaRegreso)
   const titulo = viajeInicial ? 'Editar viaje' : 'Nuevo viaje'
+  const esEdicion = !!viajeInicial
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -124,17 +112,16 @@ export default function FormularioViaje({ onGuardar, onCancelar, viajeInicial })
 
         <form onSubmit={handleSubmit}>
 
-          {/* ============ MOBILE: Modo express ============ */}
+          {/* ============ MOBILE ============ */}
           <div className="sm:hidden space-y-5">
 
-            {/* Barco — chips + opción escribir */}
+            {/* Barco */}
             <div>
               <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Barco</h3>
               {barcosRecientes.length > 0 && !barcoCustom ? (
                 <div className="flex flex-wrap gap-2 mb-2">
                   {barcosRecientes.map(b => (
-                    <button key={b} type="button"
-                      onClick={() => seleccionarBarco(b)}
+                    <button key={b} type="button" onClick={() => seleccionarBarco(b)}
                       className={`px-4 py-2 rounded-full text-sm font-semibold border transition-colors ${
                         form.barco === b
                           ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400'
@@ -145,19 +132,16 @@ export default function FormularioViaje({ onGuardar, onCancelar, viajeInicial })
                   ))}
                   <button type="button"
                     onClick={() => { setBarcoCustom(true); setForm(p => ({ ...p, barco: '' })) }}
-                    className="px-4 py-2 rounded-full text-sm font-semibold border border-navy-600 text-slate-500 bg-navy-700/40">
+                    className="px-4 py-2 rounded-full text-sm font-semibold border border-dashed border-navy-600 text-slate-500">
                     + Otro
                   </button>
                 </div>
               ) : (
                 <div className="flex gap-2">
-                  <input type="text" placeholder="Nombre del barco"
-                    value={form.barco} onChange={e => set('barco', e.target.value)}
-                    className="flex-1" autoFocus />
+                  <input type="text" placeholder="Nombre del barco" autoFocus
+                    value={form.barco} onChange={e => handleBarcoInput(e.target.value)} className="flex-1" />
                   {barcosRecientes.length > 0 && (
-                    <button type="button"
-                      onClick={() => setBarcoCustom(false)}
-                      className="btn-ghost text-xs px-3">
+                    <button type="button" onClick={() => setBarcoCustom(false)} className="btn-ghost text-xs px-3">
                       Recientes
                     </button>
                   )}
@@ -165,9 +149,9 @@ export default function FormularioViaje({ onGuardar, onCancelar, viajeInicial })
               )}
             </div>
 
-            {/* Fechas salida / regreso */}
+            {/* Fechas del viaje */}
             <div>
-              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Fechas</h3>
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Fechas del viaje</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label>Salida</label>
@@ -187,12 +171,12 @@ export default function FormularioViaje({ onGuardar, onCancelar, viajeInicial })
               )}
             </div>
 
-            {/* Cajones grande */}
+            {/* Cajones */}
             <div>
               <label>Cajones</label>
               <input type="number" min="0" placeholder="0"
                 value={form.cajones} onChange={e => set('cajones', e.target.value)}
-                className="text-2xl font-bold" style={{ fontSize: '1.4rem', fontWeight: 800 }} />
+                style={{ fontSize: '1.4rem', fontWeight: 800 }} />
             </div>
 
             {/* Especie */}
@@ -213,57 +197,23 @@ export default function FormularioViaje({ onGuardar, onCancelar, viajeInicial })
               </div>
             )}
 
-            {/* Toggle embarco = salida */}
-            <div className="bg-cyan-500/5 border border-cyan-500/15 rounded-xl p-3 flex items-center gap-3">
-              <button type="button"
-                onClick={() => toggleIgualar(!igualarFechas)}
-                className="relative flex-shrink-0"
-                style={{
-                  width: 36, height: 20, borderRadius: 10,
-                  background: igualarFechas ? '#06b6d4' : '#1a3050',
-                  transition: 'background .2s',
-                }}>
-                <span style={{
-                  position: 'absolute', width: 16, height: 16,
-                  borderRadius: '50%', background: '#04111f',
-                  top: 2, transition: 'left .2s',
-                  left: igualarFechas ? 18 : 2,
-                }} />
-              </button>
-              <div className="flex-1">
-                <p className="text-xs font-semibold text-slate-300">Embarco = Salida · Desembarco = Regreso</p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {igualarFechas ? 'Se copia automáticamente' : 'Vas a ingresar las fechas manualmente'}
-                </p>
-              </div>
-            </div>
+            {/* Período en el barco */}
+            <PeriodSection
+              form={form} set={set}
+              ultimoViaje={ultimoViaje} setUltimoViaje={setUltimoViaje}
+              embarcoAutofill={embarcoAutofill}
+              esEdicion={esEdicion}
+            />
 
             {/* Detalles adicionales colapsables */}
             <div>
-              <button type="button"
-                onClick={() => setDetallesAbiertos(v => !v)}
+              <button type="button" onClick={() => setDetallesAbiertos(v => !v)}
                 className="w-full flex items-center justify-between py-2 border-t border-navy-700 text-xs text-slate-500 hover:text-slate-300 transition-colors">
-                <span className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-500/60" />
-                  Detalles adicionales (puertos, embarco/desembarco, observaciones)
-                </span>
+                <span>Puertos y observaciones</span>
                 {detallesAbiertos ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               </button>
-
               {detallesAbiertos && (
                 <div className="space-y-4 pt-3">
-                  {!igualarFechas && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label>Embarco</label>
-                        <input type="date" value={form.fechaEmbarco} onChange={e => set('fechaEmbarco', e.target.value)} />
-                      </div>
-                      <div>
-                        <label>Desembarco</label>
-                        <input type="date" value={form.fechaDesembarco} min={form.fechaEmbarco} onChange={e => set('fechaDesembarco', e.target.value)} />
-                      </div>
-                    </div>
-                  )}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label>Puerto de partida</label>
@@ -288,28 +238,25 @@ export default function FormularioViaje({ onGuardar, onCancelar, viajeInicial })
               <button type="submit" className="btn-primary flex-1 flex items-center justify-center gap-2">
                 <Save size={16} /> {viajeInicial ? 'Guardar cambios' : 'Guardar viaje'}
               </button>
-              {onCancelar && (
-                <button type="button" onClick={onCancelar} className="btn-ghost">Cancelar</button>
-              )}
+              {onCancelar && <button type="button" onClick={onCancelar} className="btn-ghost">Cancelar</button>}
             </div>
           </div>
 
-          {/* ============ DESKTOP: Formulario completo con botones de copia ============ */}
+          {/* ============ DESKTOP ============ */}
           <div className="hidden sm:block space-y-5">
 
-            {/* Barco con historial */}
+            {/* Barco */}
             <div>
               <label>Nombre del barco</label>
               <input type="text" list="barcos-lista" placeholder="Ej: Don Hector"
-                value={form.barco} onChange={e => set('barco', e.target.value)} />
+                value={form.barco} onChange={e => handleBarcoInput(e.target.value)} />
               <datalist id="barcos-lista">
                 {barcosRecientes.map(b => <option key={b} value={b} />)}
               </datalist>
               {barcosRecientes.length > 0 && (
                 <div className="flex gap-2 mt-2 flex-wrap">
                   {barcosRecientes.map(b => (
-                    <button key={b} type="button"
-                      onClick={() => seleccionarBarco(b)}
+                    <button key={b} type="button" onClick={() => seleccionarBarco(b)}
                       className={`text-xs px-3 py-1 rounded-full border transition-colors ${
                         form.barco === b
                           ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-400'
@@ -322,9 +269,9 @@ export default function FormularioViaje({ onGuardar, onCancelar, viajeInicial })
               )}
             </div>
 
-            {/* Fechas barco */}
+            {/* Fechas del viaje */}
             <div>
-              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Fechas del barco</h3>
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Fechas del viaje</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label>Fecha de salida</label>
@@ -342,51 +289,6 @@ export default function FormularioViaje({ onGuardar, onCancelar, viajeInicial })
                   </span>
                 </div>
               )}
-            </div>
-
-            {/* Fechas agencia */}
-            <div>
-              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Registro en agencia marítima</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="!mb-0">Fecha de embarco</label>
-                    {form.fechaSalida && (
-                      <button type="button" onClick={copiarSalida}
-                        className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 transition-colors bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-md">
-                        <Copy size={10} /> = Salida
-                      </button>
-                    )}
-                  </div>
-                  <input type="date" value={form.fechaEmbarco} onChange={e => set('fechaEmbarco', e.target.value)} />
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="!mb-0">Fecha de desembarco</label>
-                    {form.fechaRegreso && (
-                      <button type="button" onClick={copiarRegreso}
-                        className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 transition-colors bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-md">
-                        <Copy size={10} /> = Regreso
-                      </button>
-                    )}
-                  </div>
-                  <input type="date" value={form.fechaDesembarco} min={form.fechaEmbarco} onChange={e => set('fechaDesembarco', e.target.value)} />
-                </div>
-              </div>
-            </div>
-
-            {/* Puertos */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label>Puerto de partida</label>
-                <input type="text" placeholder="Ej: Mar del Plata"
-                  value={form.puertoPartida} onChange={e => set('puertoPartida', e.target.value)} />
-              </div>
-              <div>
-                <label>Puerto de llegada</label>
-                <input type="text" placeholder="Ej: Mar del Plata"
-                  value={form.puertoLlegada} onChange={e => set('puertoLlegada', e.target.value)} />
-              </div>
             </div>
 
             {/* Especie + cajones */}
@@ -415,6 +317,28 @@ export default function FormularioViaje({ onGuardar, onCancelar, viajeInicial })
               </div>
             )}
 
+            {/* Período en el barco */}
+            <PeriodSection
+              form={form} set={set}
+              ultimoViaje={ultimoViaje} setUltimoViaje={setUltimoViaje}
+              embarcoAutofill={embarcoAutofill}
+              esEdicion={esEdicion}
+            />
+
+            {/* Puertos */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label>Puerto de partida</label>
+                <input type="text" placeholder="Ej: Mar del Plata"
+                  value={form.puertoPartida} onChange={e => set('puertoPartida', e.target.value)} />
+              </div>
+              <div>
+                <label>Puerto de llegada</label>
+                <input type="text" placeholder="Ej: Mar del Plata"
+                  value={form.puertoLlegada} onChange={e => set('puertoLlegada', e.target.value)} />
+              </div>
+            </div>
+
             <div>
               <label>Observaciones</label>
               <textarea rows={3} className="w-full resize-none"
@@ -426,13 +350,86 @@ export default function FormularioViaje({ onGuardar, onCancelar, viajeInicial })
               <button type="submit" className="btn-primary flex items-center gap-2">
                 <Save size={16} /> {viajeInicial ? 'Guardar cambios' : 'Guardar viaje'}
               </button>
-              {onCancelar && (
-                <button type="button" onClick={onCancelar} className="btn-ghost">Cancelar</button>
-              )}
+              {onCancelar && <button type="button" onClick={onCancelar} className="btn-ghost">Cancelar</button>}
             </div>
           </div>
 
         </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── Sección "Período en el barco" — reutilizada en mobile y desktop ────────
+function PeriodSection({ form, set, ultimoViaje, setUltimoViaje, embarcoAutofill, esEdicion }) {
+  const tieneBarco = !!form.barco.trim()
+
+  return (
+    <div className="bg-navy-800/60 border border-navy-600 rounded-xl overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-navy-700">
+        <Anchor size={15} className="text-cyan-500/70" />
+        <div className="flex-1">
+          <p className="text-xs font-semibold text-slate-300">Período en el barco</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Registro de embarco/desembarco — independiente de los viajes
+          </p>
+        </div>
+        {embarcoAutofill && (
+          <span className="text-xs bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 px-2 py-1 rounded-md">
+            autocompletado
+          </span>
+        )}
+      </div>
+
+      <div className="p-4 space-y-4">
+        {/* Fecha embarco */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="!mb-0">Fecha de embarco</label>
+            {embarcoAutofill && !esEdicion && (
+              <span className="text-xs text-slate-500">Del viaje anterior en este barco</span>
+            )}
+          </div>
+          <input type="date" value={form.fechaEmbarco}
+            onChange={e => set('fechaEmbarco', e.target.value)}
+            placeholder="Cuándo subiste al barco" />
+          {!tieneBarco && (
+            <p className="text-xs text-slate-600 mt-1">Seleccioná un barco para autocompletar</p>
+          )}
+        </div>
+
+        {/* Toggle último viaje */}
+        <div className="flex items-start gap-3 bg-navy-700/40 rounded-lg p-3">
+          <button type="button" onClick={() => setUltimoViaje(v => !v)}
+            className="relative flex-shrink-0 mt-0.5"
+            style={{
+              width: 34, height: 18, borderRadius: 9,
+              background: ultimoViaje ? '#06b6d4' : '#1a3050',
+              transition: 'background .2s',
+            }}>
+            <span style={{
+              position: 'absolute', width: 14, height: 14,
+              borderRadius: '50%', background: '#04111f',
+              top: 2, transition: 'left .2s',
+              left: ultimoViaje ? 18 : 2,
+            }} />
+          </button>
+          <div>
+            <p className="text-xs font-semibold text-slate-300">Este es mi último viaje en este barco</p>
+            <p className="text-xs text-slate-500 mt-0.5">Activá esto para registrar la fecha de desembarco</p>
+          </div>
+        </div>
+
+        {/* Fecha desembarco — solo visible si toggle on */}
+        {ultimoViaje && (
+          <div>
+            <label>Fecha de desembarco</label>
+            <input type="date" value={form.fechaDesembarco}
+              min={form.fechaEmbarco}
+              onChange={e => set('fechaDesembarco', e.target.value)} />
+          </div>
+        )}
       </div>
     </div>
   )

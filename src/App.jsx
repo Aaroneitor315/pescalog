@@ -99,6 +99,7 @@ export default function App() {
             onGuardar={handleGuardar}
             onCancelar={() => { setViajeEditando(null); setTab(viajeEditando ? 'historial' : 'dashboard') }}
             viajeInicial={viajeEditando}
+            viajes={viajes}
           />
         )}
         {tab === 'liquidacion' && <Calculadora uid={uid} />}
