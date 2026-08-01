@@ -16,7 +16,7 @@ function fmtFechaCorta(date) {
 export default function AdminPanel() {
   const { stats, sponsors, guardarSponsors, cargando } = useAdmin()
   const { convenio, guardarVersion } = useConvenio()
-  const { usuarios, cargando: cargandoUsuarios } = useAdminUsuarios()
+  const { usuarios, cargando: cargandoUsuarios, error: errorUsuarios, recargar } = useAdminUsuarios()
   const [editConvenio, setEditConvenio] = useState(null)
   const [guardadoConvenio, setGuardadoConvenio] = useState(false)
 
@@ -293,13 +293,31 @@ export default function AdminPanel() {
             <Users size={18} className="text-cyan-400" />
             <h3 className="text-base font-semibold text-white">Usuarios registrados</h3>
           </div>
-          {cargandoUsuarios && <RefreshCw size={14} className="text-slate-500 animate-spin" />}
+          <button onClick={recargar} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-cyan-400 transition-colors">
+            <RefreshCw size={13} className={cargandoUsuarios ? 'animate-spin' : ''} />
+            Recargar
+          </button>
         </div>
 
         {cargandoUsuarios ? (
           <p className="text-slate-500 text-sm text-center py-6 animate-pulse">Cargando usuarios...</p>
+        ) : errorUsuarios ? (
+          <div className="bg-red-900/20 border border-red-800/40 rounded-xl p-4 my-2">
+            <p className="text-red-400 text-sm font-semibold mb-1">Error al cargar usuarios</p>
+            <p className="text-red-300/70 text-xs font-mono break-all">{errorUsuarios}</p>
+            <p className="text-slate-500 text-xs mt-3">
+              Probable causa: las reglas de Firestore no están publicadas en Firebase Console.<br/>
+              Publicá las reglas en <span className="text-cyan-400">console.firebase.google.com</span> → Firestore → Reglas y volvé a intentarlo.
+            </p>
+            <button onClick={recargar} className="mt-3 text-xs bg-red-800/30 hover:bg-red-800/50 text-red-300 border border-red-700/40 px-3 py-1.5 rounded-lg transition-colors">
+              Reintentar
+            </button>
+          </div>
         ) : usuarios.length === 0 ? (
-          <p className="text-slate-500 text-sm text-center py-6">No hay usuarios registrados aún.</p>
+          <div className="text-center py-6">
+            <p className="text-slate-500 text-sm">No hay usuarios registrados aún.</p>
+            <p className="text-slate-600 text-xs mt-2">Si hay usuarios pero no aparecen, verificá que las reglas de Firestore estén publicadas.</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -349,9 +367,11 @@ export default function AdminPanel() {
             </table>
           </div>
         )}
-        <p className="text-xs text-slate-600 mt-4">
-          Los usuarios sin email visible aún no iniciaron sesión con la versión actualizada.
-        </p>
+        {!errorUsuarios && (
+          <p className="text-xs text-slate-600 mt-4">
+            Los usuarios sin email visible aún no iniciaron sesión con la versión actualizada.
+          </p>
+        )}
       </div>
     </div>
   )
