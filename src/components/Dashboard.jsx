@@ -3,8 +3,9 @@ import Sponsors from './Sponsors'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
-import { TrendingUp, Fish, Package, Award, DollarSign, Banknote, Waves, Eye, EyeOff } from 'lucide-react'
+import { TrendingUp, Fish, Package, Award, DollarSign, Banknote, Waves, Eye, EyeOff, RefreshCw } from 'lucide-react'
 import { calcularSingladuras } from '../hooks/useViajes'
+import { useDolar } from '../hooks/useDolar'
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 const MESES_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -51,6 +52,72 @@ const CustomTooltip = ({ active, payload, label }) => {
     <div className="bg-navy-700 border border-navy-600 rounded-lg px-3 py-2 text-sm">
       <p className="text-slate-400 mb-1">{label}</p>
       <p className="text-cyan-400 font-semibold">{payload[0].value.toLocaleString('es-AR')} cajones</p>
+    </div>
+  )
+}
+
+function DolarCards() {
+  const { cotizaciones, cargando, error, actualizadoEn, recargar } = useDolar()
+  const [flipKey, setFlipKey] = useState(0)
+
+  const fmtHora = (d) => d ? d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : ''
+
+  const colorClass = {
+    blue:   { border: 'border-blue-500/40',   accent: 'text-blue-400',   bar: 'bg-blue-500' },
+    cyan:   { border: 'border-cyan-500/40',    accent: 'text-cyan-400',   bar: 'bg-cyan-500' },
+    purple: { border: 'border-purple-500/40',  accent: 'text-purple-400', bar: 'bg-purple-500' },
+  }
+
+  const items = cotizaciones ? ['oficial', 'blue', 'mep'].map(k => cotizaciones[k]) : []
+
+  return (
+    <div className="card p-0 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-navy-700">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+          <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Cotización dólar</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {actualizadoEn && <span className="text-xs text-slate-600">{fmtHora(actualizadoEn)}</span>}
+          <button onClick={recargar} className="btn-ghost p-1 rounded" title="Actualizar">
+            <RefreshCw size={13} className="text-slate-500" />
+          </button>
+        </div>
+      </div>
+
+      {cargando && !cotizaciones && (
+        <div className="grid grid-cols-3 divide-x divide-navy-700">
+          {[0,1,2].map(i => (
+            <div key={i} className="px-4 py-4 text-center">
+              <div className="h-2.5 w-12 bg-navy-700 rounded animate-pulse mx-auto mb-2" />
+              <div className="h-5 w-20 bg-navy-700 rounded animate-pulse mx-auto" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {error && (
+        <p className="text-xs text-slate-500 text-center py-3 px-4">Sin conexión · cotizaciones no disponibles</p>
+      )}
+
+      {cotizaciones && (
+        <div className="grid grid-cols-3 divide-x divide-navy-700">
+          {items.map(item => {
+            const c = colorClass[item.color]
+            return (
+              <div key={item.key} className={`px-3 py-3 border-b-2 ${c.border} text-center`}>
+                <p className={`text-[10px] font-semibold uppercase tracking-wider mb-1 ${c.accent}`}>{item.label}</p>
+                <p className={`text-base font-bold text-white tabular-nums flip-val`} key={flipKey}>
+                  ${item.venta.toLocaleString('es-AR')}
+                </p>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  Compra ${item.compra.toLocaleString('es-AR')}
+                </p>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -189,6 +256,8 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
           </button>
         ))}
       </div>
+
+      <DolarCards />
 
       {stats ? (
         <>

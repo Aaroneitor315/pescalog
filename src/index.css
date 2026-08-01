@@ -56,6 +56,12 @@
   }
 }
 
+@keyframes flip-val {
+  0%   { opacity: 0; transform: translateY(-6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.flip-val { animation: flip-val 0.4s ease; }
+
 /* Scrollbar personalizado */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: #0d1630; }
