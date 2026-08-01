@@ -3,7 +3,7 @@ import { LogOut, Shield, BarChart2, List, Plus, BookOpen, MoreHorizontal, Dollar
 import { esAdmin } from '../hooks/useAdmin'
 
 const TABS_DESKTOP = [
-  { id: 'dashboard', label: 'Estadísticas', main: true },
+  { id: 'dashboard', label: 'Principal', main: true },
   { id: 'historial', label: 'Historial' },
   { id: 'libreta', label: 'Mi Libreta' },
   { id: 'precios', label: 'Valores' },
@@ -12,7 +12,7 @@ const TABS_DESKTOP = [
 ]
 
 const TABS_BOTTOM = [
-  { id: 'dashboard', label: 'Estadísticas', icon: BarChart2 },
+  { id: 'dashboard', label: 'Principal', icon: BarChart2 },
   { id: 'historial', label: 'Historial', icon: List },
   { id: 'nuevo', label: null, icon: Plus, fab: true },
   { id: 'libreta', label: 'Libreta', icon: BookOpen },
@@ -56,11 +56,16 @@ export default function Navbar({ tab, setTab, user, onCerrarSesion }) {
           <nav className="flex gap-1 overflow-x-auto scrollbar-none justify-center items-end">
             {TABS_DESKTOP.map(t => t.main ? (
               <button key={t.id} onClick={() => setTab(t.id)}
-                className="whitespace-nowrap px-4 py-2 rounded-lg font-bold tracking-widest text-xs uppercase transition-colors"
+                className="whitespace-nowrap px-5 py-2 rounded-lg font-black tracking-widest text-xs uppercase transition-all"
                 style={{
-                  background: tab === t.id ? '#0891b2' : '#0a2540',
-                  color: tab === t.id ? '#fff' : '#22d3ee',
-                  border: tab === t.id ? 'none' : '1px solid #22d3ee40',
+                  background: tab === t.id
+                    ? 'linear-gradient(135deg,#06b6d4,#0891b2)'
+                    : 'linear-gradient(135deg,#0c3a52,#0a2d42)',
+                  color: '#fff',
+                  border: tab === t.id ? 'none' : '1.5px solid #06b6d450',
+                  boxShadow: tab === t.id ? '0 0 16px rgba(6,182,212,0.45)' : 'none',
+                  letterSpacing: '0.12em',
+                  textShadow: tab === t.id ? '0 0 12px rgba(255,255,255,0.4)' : 'none',
                 }}>
                 {t.label}
               </button>
@@ -157,17 +162,22 @@ export default function Navbar({ tab, setTab, user, onCerrarSesion }) {
             )
 
             const active = tab === t.id
+            const isPrincipal = t.id === 'dashboard'
             return (
               <button key={t.id} onClick={() => irA(t.id)}
                 className="flex flex-col items-center gap-1 py-1 px-3">
                 <div style={{
-                  width: 32, height: 32, borderRadius: 8,
-                  background: active ? 'rgba(6,182,212,0.15)' : 'transparent',
+                  width: 32, height: 32, borderRadius: isPrincipal ? 10 : 8,
+                  background: active
+                    ? isPrincipal ? 'linear-gradient(135deg,#06b6d4,#0891b2)' : 'rgba(6,182,212,0.15)'
+                    : isPrincipal ? 'rgba(6,182,212,0.12)' : 'transparent',
+                  border: isPrincipal ? (active ? 'none' : '1px solid rgba(6,182,212,0.3)') : 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: active && isPrincipal ? '0 0 10px rgba(6,182,212,0.5)' : 'none',
                 }}>
-                  <Icon size={20} color={active ? '#06b6d4' : '#64748b'} />
+                  <Icon size={20} color={active || isPrincipal ? '#06b6d4' : '#64748b'} />
                 </div>
-                <span style={{ fontSize: 9, color: active ? '#06b6d4' : '#64748b' }}>{t.label}</span>
+                <span style={{ fontSize: 9, fontWeight: isPrincipal ? 700 : 400, color: active ? '#06b6d4' : isPrincipal ? '#0891b2' : '#64748b' }}>{t.label}</span>
               </button>
             )
           })}
