@@ -25,8 +25,10 @@ function fmtUSD(n) {
 }
 
 function mesKey(v) {
-  const d = new Date(v.fechaRegreso || v.fechaSalida || v.creadoEn)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  const iso = v.fechaRegreso || v.fechaSalida || v.creadoEn
+  if (!iso || typeof iso !== 'string') return ''
+  const [y, m] = iso.split('-')
+  return `${y}-${m}`
 }
 
 function mesLabel(key) {
