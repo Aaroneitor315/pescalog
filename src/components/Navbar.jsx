@@ -40,19 +40,18 @@ export default function Navbar({ tab, setTab, user, onCerrarSesion }) {
     <>
       {/* Header con logo — siempre visible */}
       <header className="bg-navy-800 border-b border-navy-700 sticky top-0 z-10">
-        <div className="w-full flex items-center justify-between px-4 py-3 border-b border-navy-700/50">
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-black tracking-tight text-white">Bitácora</span>
-            <span className="text-lg font-black tracking-tight" style={{color:'#06b6d4'}}>AR</span>
-          </div>
+        <div className="w-full flex items-center justify-between px-6 border-b border-navy-700/50"
+          style={{background:'linear-gradient(135deg,#ffffff 0%,#e0f7fa 60%,#b2ebf2 100%)',minHeight:72}}>
+          <img src="/logo.png" alt="BitácoraAR" style={{height:56,width:'auto',objectFit:'contain'}} />
           {user && (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 hidden sm:block truncate max-w-[140px]">{user.email}</span>
+              <span className="text-xs font-medium hidden sm:block truncate max-w-[160px]" style={{color:'#0e7490'}}>{user.email}</span>
               <div style={{
-                width:32,height:32,borderRadius:'50%',
+                width:34,height:34,borderRadius:'50%',
                 background:'linear-gradient(135deg,#0891b2,#06b6d4)',
                 display:'flex',alignItems:'center',justifyContent:'center',
-                fontSize:12,fontWeight:800,color:'#0a1929',flexShrink:0,
+                fontSize:13,fontWeight:800,color:'#fff',flexShrink:0,
+                boxShadow:'0 2px 8px rgba(6,182,212,0.35)',
               }}>
                 {(user.email?.[0] || 'U').toUpperCase()}
               </div>

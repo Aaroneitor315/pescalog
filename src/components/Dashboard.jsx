@@ -167,7 +167,7 @@ const SECTORES_INFO = [
   },
 ]
 
-export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirSector }) {
+export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirSector, onNuevoViaje }) {
   const especies = useMemo(() => {
     const set = new Set(viajes.map(v => v.especie))
     return ['todas', ...Array.from(set).sort()]
@@ -227,8 +227,63 @@ export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirS
 
   if (!viajes.length) {
     return (
-      <div className="card text-center py-16 text-slate-500">
-        No hay datos para mostrar. Registrá tu primer viaje.
+      <div className="space-y-6">
+        <DolarCards />
+        <div className="card text-center py-12 px-6 flex flex-col items-center gap-4">
+          <div style={{width:80,height:80,borderRadius:'50%',background:'rgba(6,182,212,0.1)',border:'2px solid rgba(6,182,212,0.2)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 17l4-8 4 4 3-6 4 10H3z"/><path d="M3 21h18"/>
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-white mb-1">¡Bienvenido a BitácoraAR!</h2>
+            <p className="text-slate-400 text-sm max-w-sm mx-auto">Registrá tu primer viaje y empezá a ver tus estadísticas, ganancias y stock a bordo en tiempo real.</p>
+          </div>
+          <button
+            onClick={onNuevoViaje}
+            className="btn-primary px-8 py-3 text-base font-bold rounded-xl flex items-center gap-2"
+            style={{background:'linear-gradient(135deg,#06b6d4,#0891b2)',boxShadow:'0 4px 16px rgba(6,182,212,0.35)'}}>
+            <Plus size={20} />
+            Registrar mi primer viaje
+          </button>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full mt-2">
+            {[
+              { icon: Package, label: 'Cajones y capturas', desc: 'Registrá cada marea con fecha, barco y especie', color: 'text-cyan-400' },
+              { icon: TrendingUp, label: 'Ganancias en ARS y USD', desc: 'Calculá tus liquidaciones con precios reales', color: 'text-green-400' },
+              { icon: Fish, label: 'Stock por sector', desc: 'Inventario de repuestos para máquinas, cubierta y puente', color: 'text-purple-400' },
+            ].map(({ icon: Icon, label, desc, color }) => (
+              <div key={label} className="bg-navy-900 rounded-xl p-4 border border-navy-700/50 text-left">
+                <Icon size={20} className={`${color} mb-2`} />
+                <p className="text-sm font-semibold text-white mb-1">{label}</p>
+                <p className="text-xs text-slate-500">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-3">Stock por sector</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {SECTORES_INFO.map(s => {
+              const { Icon } = s
+              return (
+                <button key={s.id} onClick={() => onAbrirSector(s.id)}
+                  className="card text-left transition-colors group p-5"
+                  style={{ borderLeft: `4px solid ${s.color}`, borderTop: 'none', borderRight: 'none', borderBottom: 'none', borderRadius: '0 12px 12px 0' }}>
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: s.color + '18', border: `1.5px solid ${s.color}40` }}>
+                      <Icon size={28} className={s.textColor} />
+                    </div>
+                    <div>
+                      <p className={`text-base font-bold ${s.textColor}`}>{s.label}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{s.sub}</p>
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
       </div>
     )
   }

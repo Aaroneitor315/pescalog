@@ -74,6 +74,7 @@ export default function App() {
             calcularTotalViaje={calcularTotalViaje}
             config={config}
             onAbrirSector={setSectorAbierto}
+            onNuevoViaje={() => setTab('nuevo')}
           />
         )}
         {tab === 'historial' && (
