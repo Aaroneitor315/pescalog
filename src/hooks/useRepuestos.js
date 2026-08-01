@@ -5,26 +5,28 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase'
 
-export function useRepuestos(uid) {
+export function useRepuestos(uid, seccion) {
   const [repuestos, setRepuestos] = useState([])
   const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
-    if (!uid) return
+    if (!uid || !seccion) return
     const q = query(
       collection(db, 'usuarios', uid, 'repuestos'),
       orderBy('creadoEn', 'desc')
     )
     const unsub = onSnapshot(q, snap => {
-      setRepuestos(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      const todos = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      setRepuestos(todos.filter(r => r.seccion === seccion))
       setCargando(false)
     })
     return unsub
-  }, [uid])
+  }, [uid, seccion])
 
   async function agregar(datos) {
     await addDoc(collection(db, 'usuarios', uid, 'repuestos'), {
       ...datos,
+      seccion,
       creadoEn: serverTimestamp(),
       actualizadoEn: serverTimestamp(),
     })

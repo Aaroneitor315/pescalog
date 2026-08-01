@@ -1,7 +1,41 @@
 import { useState, useRef } from 'react'
-import { X, Camera, Plus, Minus, Trash2, FileText, Wrench, Loader } from 'lucide-react'
+import { X, Camera, Plus, Minus, Trash2, FileText, Wrench, Anchor, Loader } from 'lucide-react'
 import { createWorker } from 'tesseract.js'
 import { useRepuestos } from '../hooks/useRepuestos'
+
+const SECTORES = {
+  maquinas: {
+    label: 'Máquinas',
+    sub: 'Sala de máquinas · repuestos y filtros',
+    Icon: Wrench,
+    color: '#0891b2',
+    colorClass: 'text-cyan-400',
+    bg: 'bg-cyan-500/10',
+    border: 'border-cyan-500/30',
+  },
+  cubierta: {
+    label: 'Cubierta',
+    sub: 'Cubierta · equipos y aparejos',
+    Icon: Anchor,
+    color: '#10b981',
+    colorClass: 'text-emerald-400',
+    bg: 'bg-emerald-500/10',
+    border: 'border-emerald-500/30',
+  },
+  puente: {
+    label: 'Puente',
+    sub: 'Puente de mando · instrumental y navegación',
+    Icon: ({ size, className }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M2 20h20M5 20V10l7-7 7 7v10M9 20v-6h6v6"/>
+      </svg>
+    ),
+    color: '#a855f7',
+    colorClass: 'text-purple-400',
+    bg: 'bg-purple-500/10',
+    border: 'border-purple-500/30',
+  },
+}
 
 const CATEGORIAS = ['Filtro aceite', 'Filtro combustible', 'Filtro aire', 'Filtro hidráulico', 'Correa', 'Rodamiento', 'Junta', 'Otro']
 
@@ -70,8 +104,10 @@ function exportarPDF(repuestos) {
   w.print()
 }
 
-export default function PanelMaquinista({ uid, onCerrar }) {
-  const { repuestos, cargando, agregar, actualizarStock, actualizarCantPedir, eliminar } = useRepuestos(uid)
+export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar }) {
+  const sector = SECTORES[seccion] || SECTORES.maquinas
+  const { Icon } = sector
+  const { repuestos, cargando, agregar, actualizarStock, actualizarCantPedir, eliminar } = useRepuestos(uid, seccion)
   const [vista, setVista] = useState('stock')
   const [ocr, setOcr] = useState({ activo: false, progreso: false, texto: '', codigo: '' })
   const [form, setForm] = useState({ codigo: '', descripcion: '', marca: '', categoria: 'Filtro aceite', stockActual: 1, stockMinimo: 1, cantPedir: 1, foto: null })
@@ -123,11 +159,11 @@ export default function PanelMaquinista({ uid, onCerrar }) {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-navy-700 bg-navy-800 flex-shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
-            <Wrench size={18} className="text-cyan-400" />
+          <div className={`w-9 h-9 rounded-xl ${sector.bg} border ${sector.border} flex items-center justify-center`}>
+            <Icon size={18} className={sector.colorClass} />
           </div>
           <div>
-            <p className="text-sm font-semibold text-white">Repuestos & Stock</p>
+            <p className="text-sm font-semibold text-white">{sector.label} · Repuestos</p>
             <p className="text-xs text-slate-500">{repuestos.length} repuesto{repuestos.length !== 1 ? 's' : ''} · {pendientes.length} alerta{pendientes.length !== 1 ? 's' : ''}</p>
           </div>
         </div>

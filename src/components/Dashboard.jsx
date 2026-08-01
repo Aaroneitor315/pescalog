@@ -1,8 +1,5 @@
 import { useState, useMemo } from 'react'
 import Sponsors from './Sponsors'
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-} from 'recharts'
 import { TrendingUp, Fish, Package, Award, DollarSign, Banknote, Waves, Eye, EyeOff, RefreshCw } from 'lucide-react'
 import { calcularSingladuras } from '../hooks/useViajes'
 import { useDolar } from '../hooks/useDolar'
@@ -122,7 +119,53 @@ function DolarCards() {
   )
 }
 
-export default function Dashboard({ viajes, calcularTotalViaje, config }) {
+const SECTORES_INFO = [
+  {
+    id: 'maquinas',
+    label: 'Máquinas',
+    sub: 'Sala de máquinas',
+    color: '#0891b2',
+    textColor: 'text-cyan-400',
+    border: 'border-cyan-500/25',
+    bg: 'bg-cyan-500/8',
+    Icon: ({ size }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'cubierta',
+    label: 'Cubierta',
+    sub: 'Aparejos y equipos',
+    color: '#10b981',
+    textColor: 'text-emerald-400',
+    border: 'border-emerald-500/25',
+    bg: 'bg-emerald-500/8',
+    Icon: ({ size }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2v6m0 0C8 8 5 11 5 15H2l10 7 10-7h-3c0-4-3-7-7-7z"/>
+        <line x1="12" y1="8" x2="12" y2="22"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'puente',
+    label: 'Puente',
+    sub: 'Navegación e instrumental',
+    color: '#a855f7',
+    textColor: 'text-purple-400',
+    border: 'border-purple-500/25',
+    bg: 'bg-purple-500/8',
+    Icon: ({ size }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 20h20M5 20V10l7-7 7 7v10M9 20v-5h6v5"/>
+      </svg>
+    ),
+  },
+]
+
+export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirSector }) {
   const especies = useMemo(() => {
     const set = new Set(viajes.map(v => v.especie))
     return ['todas', ...Array.from(set).sort()]
@@ -179,40 +222,6 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
     return { total, promedio, mejor, cantidad: viajesFiltrados.length, totalPesos, totalUSD, totalSingladuras, totalEmbarcado, embarcadoPorBarco, barcosUnicos }
   }, [viajesFiltrados, calcularTotalViaje, config])
 
-  const datosComparativa = useMemo(() => {
-    return mesesDisponibles.slice(0, 6).reverse().map(({ key, label }) => {
-      const [y, m] = key.split('-')
-      const cajones = viajes
-        .filter(v => mesKey(v) === key && (especieFiltro === 'todas' || v.especie === especieFiltro))
-        .reduce((s, v) => s + v.cajones, 0)
-      const pesos = viajes
-        .filter(v => mesKey(v) === key && (especieFiltro === 'todas' || v.especie === especieFiltro))
-        .reduce((s, v) => s + calcularTotalViaje(v).ars, 0)
-      return { mes: label, cajones, pesos }
-    })
-  }, [viajes, especieFiltro, calcularTotalViaje])
-
-  const datosGrafico = useMemo(() => {
-    const ahora = new Date()
-    const resultado = []
-    for (let i = 11; i >= 0; i--) {
-      const fecha = new Date(ahora.getFullYear(), ahora.getMonth() - i, 1)
-      const mes = fecha.getMonth()
-      const anio = fecha.getFullYear()
-      const label = `${MESES[mes]} ${String(anio).slice(2)}`
-      const cajones = viajesFiltrados
-        .filter(v => {
-          const d = new Date(v.fechaSalida)
-          return d.getMonth() === mes && d.getFullYear() === anio
-        })
-        .reduce((s, v) => s + v.cajones, 0)
-      resultado.push({ mes: label, cajones })
-    }
-    return resultado
-  }, [viajesFiltrados])
-
-  const maxCajones = Math.max(...datosGrafico.map(d => d.cajones), 1)
-  const maxComparativa = Math.max(...datosComparativa.map(d => d.cajones), 1)
 
   if (!viajes.length) {
     return (
@@ -344,31 +353,6 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
             )
           })()}
 
-          {/* Comparativa mensual — solo visible en vista "todos" */}
-          {mesFiltro === 'todos' && datosComparativa.some(d => d.cajones > 0) && (
-            <div className="card">
-              <h3 className="text-sm font-semibold text-white mb-4">Comparativa mensual</h3>
-              <div className="space-y-3">
-                {datosComparativa.map(d => (
-                  <div key={d.mes} className="flex items-center gap-3">
-                    <span className="text-xs text-slate-500 w-12 shrink-0">{d.mes}</span>
-                    <div className="flex-1 h-2 bg-navy-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-cyan-500/80 rounded-full transition-all"
-                        style={{ width: `${(d.cajones / maxComparativa) * 100}%` }} />
-                    </div>
-                    <span className="text-xs text-slate-400 w-24 text-right shrink-0 font-mono">
-                      {d.cajones.toLocaleString('es-AR')} caj.
-                    </span>
-                    {d.pesos > 0 && (
-                      <span className="text-xs text-green-400 w-28 text-right shrink-0 hidden sm:block">
-                        {monto(fmtPesos(d.pesos))}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </>
       ) : (
         <div className="card text-center py-10 text-slate-500">
@@ -376,56 +360,37 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
         </div>
       )}
 
-      {/* Gráfico cajones 12 meses */}
-      <div className="card">
-        <h3 className="text-base font-semibold text-white mb-6">
-          Cajones por mes — últimos 12 meses
-          {especieFiltro !== 'todas' && <span className="text-cyan-400 font-normal ml-2">({capitalize(especieFiltro)})</span>}
-        </h3>
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={datosGrafico} barSize={28} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#163058" vertical={false} />
-            <XAxis dataKey="mes" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} width={48}
-              tickFormatter={v => v === 0 ? '0' : v >= 1000 ? `${(v/1000).toFixed(1)}k` : v} />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#163058' }} />
-            <Bar dataKey="cajones" radius={[4, 4, 0, 0]}>
-              {datosGrafico.map((entry, i) => (
-                <Cell key={i} fill={entry.cajones === maxCajones && entry.cajones > 0 ? '#22d3ee' : '#0891b2'} opacity={entry.cajones === 0 ? 0.2 : 1} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-        <p className="text-xs text-slate-600 mt-2 text-right">La barra más alta está resaltada en cyan</p>
-      </div>
-
-      {especieFiltro === 'todas' && (
-        <div className="card">
-          <h3 className="text-base font-semibold text-white mb-4">Cajones por especie</h3>
-          <div className="space-y-3">
-            {(() => {
-              const por = {}
-              viajesFiltrados.forEach(v => { por[v.especie] = (por[v.especie] || 0) + v.cajones })
-              const total = Object.values(por).reduce((s, n) => s + n, 0)
-              return Object.entries(por).sort((a, b) => b[1] - a[1]).map(([esp, n]) => (
-                <div key={esp}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-slate-300">{capitalize(esp)}</span>
-                    <div className="flex gap-3">
-                      {config.precios[esp]?.usd > 0 && <span className="text-blue-400 text-xs">{monto(fmtUSD(n * config.precios[esp].usd))}</span>}
-                      {config.precios[esp]?.ars > 0 && <span className="text-green-400 text-xs">{monto(fmtPesos(n * config.precios[esp].ars))}</span>}
-                      <span className="text-white font-medium">{n.toLocaleString('es-AR')} caj.</span>
-                    </div>
+      {/* Sectores a bordo */}
+      <div>
+        <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-3">Stock por sector</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {SECTORES_INFO.map(s => {
+            const { Icon } = s
+            return (
+              <button
+                key={s.id}
+                onClick={() => onAbrirSector(s.id)}
+                className="card text-left hover:border-slate-600 transition-colors group p-5"
+                style={{ borderColor: s.color + '30' }}
+              >
+                <div className="flex items-center gap-4">
+                  <div
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105"
+                    style={{ background: s.color + '18', border: `1.5px solid ${s.color}40` }}
+                  >
+                    <Icon size={28} className={s.textColor} />
                   </div>
-                  <div className="h-2 bg-navy-700 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-full transition-all" style={{ width: `${(n / total) * 100}%` }} />
+                  <div>
+                    <p className={`text-base font-bold ${s.textColor}`}>{s.label}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{s.sub}</p>
+                    <p className="text-xs text-slate-600 mt-1">Tocá para ver stock →</p>
                   </div>
                 </div>
-              ))
-            })()}
-          </div>
+              </button>
+            )
+          })}
         </div>
-      )}
+      </div>
 
       <div className="border-t border-navy-700 pt-6">
         <Sponsors />

@@ -18,7 +18,7 @@ export default function App() {
   const { user, loading, cerrarSesion } = useAuth()
   const [tab, setTab] = useState('dashboard')
   const [viajeEditando, setViajeEditando] = useState(null)
-  const [panelMaquinista, setPanelMaquinista] = useState(false)
+  const [sectorAbierto, setSectorAbierto] = useState(null)
 
   const uid = user?.uid || null
   const { viajes, agregarViaje, eliminarViaje, editarViaje } = useViajes(uid)
@@ -56,34 +56,9 @@ export default function App() {
     <div className="min-h-screen">
       <Navbar tab={tab} setTab={setTab} user={user} onCerrarSesion={cerrarSesion} />
 
-      {/* FAB llave — flotante sobre todo, lado derecho */}
-      <button
-        onClick={() => setPanelMaquinista(true)}
-        title="Repuestos & Stock"
-        style={{
-          position: 'fixed',
-          right: 12,
-          bottom: 80,
-          zIndex: 40,
-          width: 48,
-          height: 48,
-          borderRadius: '50%',
-          background: '#0891b2',
-          border: '2.5px solid #0a1929',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 4px 16px rgba(8,145,178,0.45)',
-          cursor: 'pointer',
-        }}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-        </svg>
-      </button>
-
-      {/* Panel maquinista */}
-      {panelMaquinista && (
-        <PanelMaquinista uid={uid} onCerrar={() => setPanelMaquinista(false)} />
+      {/* Panel sectores a bordo */}
+      {sectorAbierto && (
+        <PanelMaquinista uid={uid} seccion={sectorAbierto} onCerrar={() => setSectorAbierto(null)} />
       )}
 
       <main className="max-w-6xl mx-auto px-4 pt-8 pb-24 sm:py-8 relative">
@@ -98,6 +73,7 @@ export default function App() {
             viajes={viajes}
             calcularTotalViaje={calcularTotalViaje}
             config={config}
+            onAbrirSector={setSectorAbierto}
           />
         )}
         {tab === 'historial' && (
