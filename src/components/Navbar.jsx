@@ -20,6 +20,7 @@ const TABS_BOTTOM = [
 ]
 
 const TABS_MAS = [
+  { id: 'nuevo', label: '+ Nuevo viaje', icon: Plus },
   { id: 'precios', label: 'Valores', icon: DollarSign },
   { id: 'liquidacion', label: 'Calculadora', icon: Calculator },
 ]
@@ -39,14 +40,22 @@ export default function Navbar({ tab, setTab, user, onCerrarSesion }) {
     <>
       {/* Header con logo — siempre visible */}
       <header className="bg-navy-800 border-b border-navy-700 sticky top-0 z-10">
-        <div className="w-full flex justify-center py-3 border-b border-navy-700/50 relative">
-          <img src="/logo.png" alt="BitácoraAR" className="h-36 w-auto" />
+        <div className="w-full flex items-center justify-between px-4 py-3 border-b border-navy-700/50">
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-black tracking-tight text-white">Bitácora</span>
+            <span className="text-lg font-black tracking-tight" style={{color:'#06b6d4'}}>AR</span>
+          </div>
           {user && (
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500 hidden sm:block truncate max-w-[140px]">{user.email}</span>
-              <button onClick={onCerrarSesion} title="Cerrar sesión" className="btn-ghost p-2 rounded-lg">
-                <LogOut size={16} />
-              </button>
+              <div style={{
+                width:32,height:32,borderRadius:'50%',
+                background:'linear-gradient(135deg,#0891b2,#06b6d4)',
+                display:'flex',alignItems:'center',justifyContent:'center',
+                fontSize:12,fontWeight:800,color:'#0a1929',flexShrink:0,
+              }}>
+                {(user.email?.[0] || 'U').toUpperCase()}
+              </div>
             </div>
           )}
         </div>
@@ -104,11 +113,12 @@ export default function Navbar({ tab, setTab, user, onCerrarSesion }) {
             <div className="grid grid-cols-2 gap-2">
               {TABS_MAS.map(t => {
                 const Icon = t.icon
+                const isNuevo = t.id === 'nuevo'
                 return (
                   <button key={t.id} onClick={() => irA(t.id)}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${tab === t.id ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'bg-navy-700/60 text-slate-300 hover:bg-navy-700'}`}>
-                    <Icon size={18} />
-                    <span className="text-sm font-medium">{t.label}</span>
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${isNuevo ? 'col-span-2 font-bold' : ''} ${tab === t.id ? (isNuevo ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-500/50' : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30') : (isNuevo ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/25 hover:bg-cyan-500/25' : 'bg-navy-700/60 text-slate-300 hover:bg-navy-700')}`}>
+                    <Icon size={isNuevo ? 20 : 18} />
+                    <span className={isNuevo ? 'text-base font-bold' : 'text-sm font-medium'}>{t.label}</span>
                   </button>
                 )
               })}
@@ -119,6 +129,11 @@ export default function Navbar({ tab, setTab, user, onCerrarSesion }) {
                   <span className="text-sm font-medium">Admin</span>
                 </button>
               )}
+              <button onClick={() => { setMasAbierto(false); onCerrarSesion() }}
+                className="col-span-2 flex items-center gap-3 px-4 py-3 rounded-xl bg-red-900/20 text-red-400 border border-red-800/30 hover:bg-red-900/35 transition-colors mt-1">
+                <LogOut size={18} />
+                <span className="text-sm font-bold">Cerrar sesión</span>
+              </button>
             </div>
           </div>
         </div>
@@ -143,7 +158,7 @@ export default function Navbar({ tab, setTab, user, onCerrarSesion }) {
                 }}>
                   <Icon size={24} color="#0a1929" />
                 </div>
-                <span style={{ fontSize: 9, marginTop: 3, color: tab === 'nuevo' ? '#06b6d4' : '#64748b' }}>+ Viaje</span>
+                <span style={{ fontSize: 9, marginTop: 3, fontWeight: 700, color: tab === 'nuevo' ? '#06b6d4' : '#94a3b8' }}>Nuevo viaje</span>
               </button>
             )
 
@@ -165,7 +180,8 @@ export default function Navbar({ tab, setTab, user, onCerrarSesion }) {
             const isPrincipal = t.id === 'dashboard'
             return (
               <button key={t.id} onClick={() => irA(t.id)}
-                className="flex flex-col items-center gap-1 py-1 px-3">
+                className="flex flex-col items-center gap-1 py-1 px-3" style={{position:'relative'}}>
+                {active && <span style={{position:'absolute',top:0,left:'50%',transform:'translateX(-50%)',width:20,height:3,borderRadius:2,background:'#06b6d4',transition:'left 0.2s'}} />}
                 <div style={{
                   width: 32, height: 32, borderRadius: isPrincipal ? 10 : 8,
                   background: active

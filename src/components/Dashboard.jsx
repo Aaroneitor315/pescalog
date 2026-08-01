@@ -32,7 +32,7 @@ function StatCard({ icon: Icon, label, value, sub, accent, iconBg }) {
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">{label}</p>
-          <p className={`text-2xl font-bold mt-1 ${accent || 'text-white'}`}>{value}</p>
+          <p className={`text-3xl font-black mt-1 tracking-tight ${accent || 'text-white'}`}>{value}</p>
           {sub && <p className="text-xs text-slate-500 mt-1">{sub}</p>}
         </div>
         <div className={`${iconBg || 'bg-navy-700'} p-2 rounded-lg`}>
@@ -98,13 +98,15 @@ function DolarCards() {
       )}
 
       {cotizaciones && (
-        <div className="grid grid-cols-3 divide-x divide-navy-700">
+        <div className="grid grid-cols-3 gap-2 p-2">
           {items.map(item => {
             const c = colorClass[item.color]
+            const borderColors = { blue: '#3b82f6', cyan: '#06b6d4', purple: '#8b5cf6' }
             return (
-              <div key={item.key} className={`px-3 py-3 border-b-2 ${c.border} text-center`}>
-                <p className={`text-[10px] font-semibold uppercase tracking-wider mb-1 ${c.accent}`}>{item.label}</p>
-                <p className={`text-base font-bold text-white tabular-nums flip-val`} key={flipKey}>
+              <div key={item.key} className="rounded-xl px-3 py-3 bg-navy-900"
+                style={{ borderLeft: `3px solid ${borderColors[item.color]}` }}>
+                <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${c.accent}`}>{item.label}</p>
+                <p className="text-lg font-black text-white tabular-nums tracking-tight flip-val" key={flipKey}>
                   ${item.venta.toLocaleString('es-AR')}
                 </p>
                 <p className="text-[10px] text-slate-500 mt-0.5">
@@ -370,8 +372,8 @@ export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirS
               <button
                 key={s.id}
                 onClick={() => onAbrirSector(s.id)}
-                className="card text-left hover:border-slate-600 transition-colors group p-5"
-                style={{ borderColor: s.color + '30' }}
+                className="card text-left transition-colors group p-5"
+                style={{ borderLeft: `4px solid ${s.color}`, borderTop: 'none', borderRight: 'none', borderBottom: 'none', borderRadius: '0 12px 12px 0' }}
               >
                 <div className="flex items-center gap-4">
                   <div

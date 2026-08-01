@@ -21,7 +21,7 @@
 
 @layer components {
   .card {
-    @apply bg-navy-800 rounded-xl border border-navy-700 p-6;
+    @apply bg-navy-800 rounded-xl border border-navy-700/60 p-6;
   }
 
   .btn-primary {
@@ -64,6 +64,6 @@
 
 /* Scrollbar personalizado */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #0d1630; }
-::-webkit-scrollbar-thumb { background: #163058; border-radius: 3px; }
+::-webkit-scrollbar-track { background: #080f1a; }
+::-webkit-scrollbar-thumb { background: #1a304e; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #06b6d4; }
