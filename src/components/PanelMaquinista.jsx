@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, Camera, Plus, Minus, Trash2, FileText, Wrench, Anchor, Loader } from 'lucide-react'
+import { X, Camera, Plus, Minus, Trash2, FileText, Wrench, Anchor, Loader, Pencil } from 'lucide-react'
 import { createWorker } from 'tesseract.js'
 import { useRepuestos } from '../hooks/useRepuestos'
 
@@ -107,13 +107,46 @@ function exportarPDF(repuestos) {
 export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar }) {
   const sector = SECTORES[seccion] || SECTORES.maquinas
   const { Icon } = sector
-  const { repuestos, cargando, agregar, actualizarStock, actualizarCantPedir, eliminar } = useRepuestos(uid, seccion)
+  const { repuestos, cargando, agregar, editar, actualizarStock, actualizarCantPedir, eliminar } = useRepuestos(uid, seccion)
   const [vista, setVista] = useState('stock')
   const [ocr, setOcr] = useState({ activo: false, progreso: false, texto: '', codigo: '' })
   const [form, setForm] = useState({ codigo: '', descripcion: '', marca: '', categoria: 'Filtro aceite', stockActual: 1, stockMinimo: 1, cantPedir: 1, foto: null })
   const [modoAgregar, setModoAgregar] = useState(false)
+  const [editandoId, setEditandoId] = useState(null)
   const [confirmarId, setConfirmarId] = useState(null)
   const fileRef = useRef()
+
+  function abrirEdicion(r) {
+    setEditandoId(r.id)
+    setForm({
+      codigo: r.codigo || '',
+      descripcion: r.descripcion || '',
+      marca: r.marca || '',
+      categoria: r.categoria || 'Filtro aceite',
+      stockActual: r.stockActual ?? 1,
+      stockMinimo: r.stockMinimo ?? 1,
+      cantPedir: r.cantPedir ?? 1,
+      foto: r.foto || null,
+    })
+    setModoAgregar(true)
+  }
+
+  async function guardarEdicion() {
+    if (!form.codigo.trim()) return
+    await editar(editandoId, {
+      codigo: form.codigo.trim().toUpperCase(),
+      descripcion: form.descripcion.trim(),
+      marca: form.marca.trim(),
+      categoria: form.categoria,
+      stockActual: Number(form.stockActual),
+      stockMinimo: Number(form.stockMinimo),
+      cantPedir: Number(form.cantPedir),
+      foto: form.foto || null,
+    })
+    setModoAgregar(false)
+    setEditandoId(null)
+    setForm({ codigo: '', descripcion: '', marca: '', categoria: 'Filtro aceite', stockActual: 1, stockMinimo: 1, cantPedir: 1, foto: null })
+  }
 
   async function procesarFoto(e) {
     const file = e.target.files[0]
@@ -194,14 +227,16 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
             {/* Botón agregar / formulario */}
             {!modoAgregar ? (
               <div className="p-4">
-                <button onClick={() => setModoAgregar(true)}
+                <button onClick={() => { setEditandoId(null); setModoAgregar(true) }}
                   className="w-full flex items-center justify-center gap-2 border border-dashed border-navy-600 hover:border-cyan-500/50 text-slate-500 hover:text-cyan-400 py-3 rounded-xl transition-colors text-sm">
                   <Camera size={16} /> Fotografiar / agregar repuesto
                 </button>
               </div>
             ) : (
               <div className="m-4 bg-navy-800 border border-navy-700 rounded-xl p-4 space-y-3">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Nuevo repuesto</p>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  {editandoId ? 'Editar repuesto' : 'Nuevo repuesto'}
+                </p>
 
                 {/* Foto + OCR */}
                 <div className="flex gap-3">
@@ -252,10 +287,12 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
                       onChange={e => setForm(f => ({ ...f, cantPedir: e.target.value }))} className="text-sm" /></div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => { setModoAgregar(false); setOcr({ activo: false, progreso: false, texto: '', codigo: '' }); setForm({ codigo: '', descripcion: '', marca: '', categoria: 'Filtro aceite', stockActual: 1, stockMinimo: 1, cantPedir: 1, foto: null }) }}
+                  <button onClick={() => { setModoAgregar(false); setEditandoId(null); setOcr({ activo: false, progreso: false, texto: '', codigo: '' }); setForm({ codigo: '', descripcion: '', marca: '', categoria: 'Filtro aceite', stockActual: 1, stockMinimo: 1, cantPedir: 1, foto: null }) }}
                     className="flex-1 btn-ghost py-2 text-sm rounded-lg">Cancelar</button>
-                  <button onClick={guardarRepuesto} disabled={!form.codigo.trim()}
-                    className="flex-1 btn-primary py-2 text-sm disabled:opacity-40">Guardar</button>
+                  <button onClick={editandoId ? guardarEdicion : guardarRepuesto} disabled={!form.codigo.trim()}
+                    className="flex-1 btn-primary py-2 text-sm disabled:opacity-40">
+                    {editandoId ? 'Guardar cambios' : 'Guardar'}
+                  </button>
                 </div>
               </div>
             )}
@@ -297,7 +334,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
                       </div>
                       {/* Badge estado */}
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${c.bg} ${c.text} w-10 text-center`}>{c.label}</span>
-                      {/* Eliminar */}
+                      {/* Editar / Eliminar */}
                       {confirmarId === r.id ? (
                         <div className="flex gap-1">
                           <button onClick={() => { eliminar(r.id); setConfirmarId(null) }}
@@ -306,9 +343,14 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
                             className="text-[10px] bg-navy-700 text-slate-400 px-2 py-1 rounded">No</button>
                         </div>
                       ) : (
-                        <button onClick={() => setConfirmarId(r.id)} className="btn-ghost p-1 rounded">
-                          <Trash2 size={13} className="text-slate-600 hover:text-red-400" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => abrirEdicion(r)} className="btn-ghost p-1 rounded" title="Editar">
+                            <Pencil size={13} className="text-cyan-400" />
+                          </button>
+                          <button onClick={() => setConfirmarId(r.id)} className="btn-ghost p-1 rounded" title="Eliminar">
+                            <Trash2 size={13} className="text-slate-600 hover:text-red-400" />
+                          </button>
+                        </div>
                       )}
                     </div>
                   )

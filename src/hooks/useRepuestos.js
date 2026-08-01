@@ -46,9 +46,16 @@ export function useRepuestos(uid, seccion) {
     })
   }
 
+  async function editar(id, datos) {
+    await updateDoc(doc(db, 'usuarios', uid, 'repuestos', id), {
+      ...datos,
+      actualizadoEn: serverTimestamp(),
+    })
+  }
+
   async function eliminar(id) {
     await deleteDoc(doc(db, 'usuarios', uid, 'repuestos', id))
   }
 
-  return { repuestos, cargando, agregar, actualizarStock, actualizarCantPedir, eliminar }
+  return { repuestos, cargando, agregar, editar, actualizarStock, actualizarCantPedir, eliminar }
 }
