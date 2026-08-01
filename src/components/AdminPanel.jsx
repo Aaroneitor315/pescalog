@@ -332,9 +332,9 @@ export default function AdminPanel() {
               </thead>
               <tbody className="divide-y divide-navy-700">
                 {usuarios.map(u => (
-                  <tr key={u.uid} className="hover:bg-navy-700/30 transition-colors">
+                  <tr key={u.uid} className={`hover:bg-navy-700/30 transition-colors ${u.sinDocumento ? 'opacity-60' : ''}`}>
                     <td className="py-3 pr-4">
-                      <span className={`text-sm font-medium ${u.email === 'alangambacorta7@gmail.com' ? 'text-yellow-400' : 'text-slate-300'}`}>
+                      <span className={`text-sm font-medium ${u.email === 'alangambacorta7@gmail.com' ? 'text-yellow-400' : u.sinDocumento ? 'text-slate-500 italic' : 'text-slate-300'}`}>
                         {u.email}
                         {u.email === 'alangambacorta7@gmail.com' && (
                           <span className="ml-2 text-xs bg-yellow-500/15 text-yellow-400 border border-yellow-500/20 px-2 py-0.5 rounded-full">admin</span>
@@ -354,7 +354,14 @@ export default function AdminPanel() {
               </tbody>
               <tfoot>
                 <tr className="border-t border-navy-600">
-                  <td className="pt-3 text-xs text-slate-500">{usuarios.length} usuarios en total</td>
+                  <td className="pt-3 text-xs text-slate-500">
+                    {usuarios.length} usuarios en total
+                    {usuarios.filter(u => u.sinDocumento).length > 0 && (
+                      <span className="ml-2 text-slate-600">
+                        ({usuarios.filter(u => u.sinDocumento).length} pendientes de re-login)
+                      </span>
+                    )}
+                  </td>
                   <td className="pt-3 px-4 text-right text-cyan-400 font-semibold text-sm">
                     {usuarios.reduce((s, u) => s + u.totalViajes, 0)}
                   </td>
