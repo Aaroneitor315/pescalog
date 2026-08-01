@@ -217,7 +217,7 @@ export default function HistorialViajes({ viajes, onEliminar, onEditar, calcular
                                 <span className="truncate block" title={v.observaciones}>{v.observaciones || <span className="italic text-slate-600">—</span>}</span>
                               </td>
                               <td className="px-4 py-3">
-                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100">
+                                <div className="flex items-center gap-2">
                                   <button onClick={() => onEditar(v)} className="btn-ghost p-1.5 rounded-lg" title="Editar viaje">
                                     <Pencil size={14} className="text-cyan-400" />
                                   </button>

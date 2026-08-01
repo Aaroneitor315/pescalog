@@ -162,9 +162,10 @@ export default function Dashboard({ viajes, calcularTotalViaje, config }) {
           <h2 className="text-xl font-semibold text-white">
             {mesActual ? mesActual.labelFull : 'Todos los períodos'}
           </h2>
-          <button onClick={toggleOcultarMontos} title={ocultarMontos ? 'Mostrar montos' : 'Ocultar montos'}
-            className="text-slate-500 hover:text-slate-300 transition-colors">
-            {ocultarMontos ? <EyeOff size={16} /> : <Eye size={16} />}
+          <button onClick={toggleOcultarMontos}
+            className="flex items-center gap-2 bg-navy-700/60 hover:bg-navy-700 border border-navy-600 hover:border-slate-500 text-slate-400 hover:text-slate-200 transition-colors px-3 py-1.5 rounded-lg">
+            {ocultarMontos ? <EyeOff size={18} /> : <Eye size={18} />}
+            <span className="text-xs font-medium">{ocultarMontos ? 'Mostrar datos' : 'Ocultar datos'}</span>
           </button>
         </div>
         <select className="w-44 text-sm py-1.5" value={especieFiltro} onChange={e => setEspecieFiltro(e.target.value)}>
