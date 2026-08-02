@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react'
 import { X, Camera, Plus, Minus, Trash2, FileText, Wrench, Anchor, Loader, Pencil } from 'lucide-react'
 import { createWorker } from 'tesseract.js'
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
+import { storage } from '../firebase'
 import { useRepuestos } from '../hooks/useRepuestos'
 
 const SECTORES = {
@@ -44,15 +46,30 @@ function comprimirFoto(file) {
     const canvas = document.createElement('canvas')
     const img = new Image()
     img.onload = () => {
-      const MAX = 200
+      const MAX = 400
       const ratio = Math.min(MAX / img.width, MAX / img.height)
       canvas.width = img.width * ratio
       canvas.height = img.height * ratio
       canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
-      resolve(canvas.toDataURL('image/jpeg', 0.7))
+      canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.75)
     }
     img.src = URL.createObjectURL(file)
   })
+}
+
+async function subirFoto(uid, seccion, blob) {
+  const nombre = `repuestos/${uid}/${seccion}/${Date.now()}.jpg`
+  const storageRef = ref(storage, nombre)
+  await uploadBytes(storageRef, blob)
+  return await getDownloadURL(storageRef)
+}
+
+async function eliminarFotoStorage(url) {
+  if (!url || url.startsWith('data:')) return
+  try {
+    const storageRef = ref(storage, url)
+    await deleteObject(storageRef)
+  } catch {}
 }
 
 function extraerCodigo(texto) {
@@ -110,10 +127,11 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
   const { repuestos, cargando, agregar, editar, actualizarStock, actualizarCantPedir, eliminar } = useRepuestos(uid, seccion)
   const [vista, setVista] = useState('stock')
   const [ocr, setOcr] = useState({ activo: false, progreso: false, texto: '', codigo: '' })
-  const [form, setForm] = useState({ codigo: '', descripcion: '', marca: '', categoria: 'Filtro aceite', stockActual: 1, stockMinimo: 1, cantPedir: 1, foto: null })
+  const [form, setForm] = useState({ codigo: '', descripcion: '', marca: '', categoria: 'Filtro aceite', stockActual: 1, stockMinimo: 1, cantPedir: 1, foto: null, fotoBlob: null, fotoPreview: null })
   const [modoAgregar, setModoAgregar] = useState(false)
   const [editandoId, setEditandoId] = useState(null)
   const [confirmarId, setConfirmarId] = useState(null)
+  const [subiendo, setSubiendo] = useState(false)
   const fileRef = useRef()
 
   function abrirEdicion(r) {
@@ -131,8 +149,17 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     setModoAgregar(true)
   }
 
+  const resetForm = () => setForm({ codigo: '', descripcion: '', marca: '', categoria: 'Filtro aceite', stockActual: 1, stockMinimo: 1, cantPedir: 1, foto: null, fotoBlob: null, fotoPreview: null })
+
   async function guardarEdicion() {
     if (!form.codigo.trim()) return
+    setSubiendo(true)
+    let fotoUrl = form.foto
+    if (form.fotoBlob) {
+      const viejoRepuesto = repuestos.find(r => r.id === editandoId)
+      await eliminarFotoStorage(viejoRepuesto?.foto)
+      fotoUrl = await subirFoto(uid, seccion, form.fotoBlob)
+    }
     await editar(editandoId, {
       codigo: form.codigo.trim().toUpperCase(),
       descripcion: form.descripcion.trim(),
@@ -141,11 +168,12 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
       stockActual: Number(form.stockActual),
       stockMinimo: Number(form.stockMinimo),
       cantPedir: Number(form.cantPedir),
-      foto: form.foto || null,
+      foto: fotoUrl || null,
     })
+    setSubiendo(false)
     setModoAgregar(false)
     setEditandoId(null)
-    setForm({ codigo: '', descripcion: '', marca: '', categoria: 'Filtro aceite', stockActual: 1, stockMinimo: 1, cantPedir: 1, foto: null })
+    resetForm()
   }
 
   async function procesarFoto(e) {
@@ -153,8 +181,9 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     if (!file) return
     setOcr({ activo: true, progreso: true, texto: '', codigo: '' })
     setModoAgregar(true)
-    const thumb = await comprimirFoto(file)
-    setForm(f => ({ ...f, foto: thumb }))
+    const blob = await comprimirFoto(file)
+    const preview = URL.createObjectURL(blob)
+    setForm(f => ({ ...f, fotoBlob: blob, fotoPreview: preview, foto: preview }))
     try {
       const worker = await createWorker('eng')
       const { data: { text } } = await worker.recognize(file)
@@ -169,6 +198,11 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
 
   async function guardarRepuesto() {
     if (!form.codigo.trim()) return
+    setSubiendo(true)
+    let fotoUrl = null
+    if (form.fotoBlob) {
+      fotoUrl = await subirFoto(uid, seccion, form.fotoBlob)
+    }
     await agregar({
       codigo: form.codigo.trim().toUpperCase(),
       descripcion: form.descripcion.trim(),
@@ -177,11 +211,12 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
       stockActual: Number(form.stockActual),
       stockMinimo: Number(form.stockMinimo),
       cantPedir: Number(form.cantPedir),
-      foto: form.foto || null,
+      foto: fotoUrl || null,
     })
+    setSubiendo(false)
     setModoAgregar(false)
     setOcr({ activo: false, progreso: false, texto: '', codigo: '' })
-    setForm({ codigo: '', descripcion: '', marca: '', categoria: 'Filtro aceite', stockActual: 1, stockMinimo: 1, cantPedir: 1, foto: null })
+    resetForm()
   }
 
   const pendientes = repuestos.filter(r => r.stockActual <= r.stockMinimo)
@@ -287,11 +322,11 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
                       onChange={e => setForm(f => ({ ...f, cantPedir: e.target.value }))} className="text-sm" /></div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => { setModoAgregar(false); setEditandoId(null); setOcr({ activo: false, progreso: false, texto: '', codigo: '' }); setForm({ codigo: '', descripcion: '', marca: '', categoria: 'Filtro aceite', stockActual: 1, stockMinimo: 1, cantPedir: 1, foto: null }) }}
+                  <button onClick={() => { setModoAgregar(false); setEditandoId(null); setOcr({ activo: false, progreso: false, texto: '', codigo: '' }); resetForm() }}
                     className="flex-1 btn-ghost py-2 text-sm rounded-lg">Cancelar</button>
-                  <button onClick={editandoId ? guardarEdicion : guardarRepuesto} disabled={!form.codigo.trim()}
+                  <button onClick={editandoId ? guardarEdicion : guardarRepuesto} disabled={!form.codigo.trim() || subiendo}
                     className="flex-1 btn-primary py-2 text-sm disabled:opacity-40">
-                    {editandoId ? 'Guardar cambios' : 'Guardar'}
+                    {subiendo ? 'Subiendo...' : editandoId ? 'Guardar cambios' : 'Guardar'}
                   </button>
                 </div>
               </div>

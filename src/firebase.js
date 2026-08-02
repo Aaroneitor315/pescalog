@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore'
+import { getStorage } from 'firebase/storage'
 
 const firebaseConfig = {
   apiKey: "AIzaSyAl6kfCYvThvPru5ivfMm76KEDN4WYFHR8",
@@ -18,3 +19,4 @@ export const db = initializeFirestore(app, {
     tabManager: persistentMultipleTabManager(),
   }),
 })
+export const storage = getStorage(app)
