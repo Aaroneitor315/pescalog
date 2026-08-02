@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAdmin } from '../hooks/useAdmin'
 import { useConvenio } from '../hooks/useConvenio'
 import { useAdminUsuarios } from '../hooks/useAdminUsuarios'
-import { Shield, Package, ToggleLeft, ToggleRight, Save, Star, FileText, Users, RefreshCw } from 'lucide-react'
+import { Shield, Package, ToggleLeft, ToggleRight, Save, Star, FileText, Users, RefreshCw, TrendingUp, CheckCircle, Activity, Wrench, Anchor, Navigation } from 'lucide-react'
 
 function fmtNum(n) {
   return (n || 0).toLocaleString('es-AR')
@@ -16,7 +16,7 @@ function fmtFechaCorta(date) {
 export default function AdminPanel() {
   const { stats, sponsors, guardarSponsors, cargando } = useAdmin()
   const { convenio, guardarVersion } = useConvenio()
-  const { usuarios, cargando: cargandoUsuarios, error: errorUsuarios, recargar } = useAdminUsuarios()
+  const { usuarios, metricas, cargando: cargandoUsuarios, error: errorUsuarios, recargar } = useAdminUsuarios()
   const [editConvenio, setEditConvenio] = useState(null)
   const [guardadoConvenio, setGuardadoConvenio] = useState(false)
 
@@ -115,6 +115,78 @@ export default function AdminPanel() {
         </div>
       </div>
 
+
+      {/* Métricas de usuarios */}
+      {metricas && (
+        <div className="card space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingUp size={18} className="text-cyan-400" />
+              <h3 className="text-base font-semibold text-white">Métricas de usuarios</h3>
+            </div>
+            <button onClick={recargar} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-cyan-400 transition-colors">
+              <RefreshCw size={13} className={cargandoUsuarios ? 'animate-spin' : ''} />
+              Actualizar
+            </button>
+          </div>
+
+          {/* Fila 1 — números clave */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: 'Usuarios totales', value: metricas.totalUsuarios, icon: Users, color: '#06b6d4' },
+              { label: 'Onboarding completo', value: metricas.onboardingCompleto, icon: CheckCircle, color: '#34d399', sub: `${metricas.totalUsuarios - metricas.onboardingCompleto} pendientes` },
+              { label: 'Activos últimos 30d', value: metricas.activosUltimos30, icon: Activity, color: '#f59e0b' },
+              { label: 'Con viajes cargados', value: metricas.conViajes, icon: Package, color: '#a78bfa' },
+            ].map(m => {
+              const Icon = m.icon
+              return (
+                <div key={m.label} className="bg-navy-700/50 border border-navy-600 rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-slate-500 leading-tight">{m.label}</p>
+                    <Icon size={14} style={{ color: m.color }} />
+                  </div>
+                  <p className="text-2xl font-black" style={{ color: m.color }}>{m.value}</p>
+                  {m.sub && <p className="text-xs text-slate-600 mt-0.5">{m.sub}</p>}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Fila 2 — distribución por sector */}
+          <div>
+            <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Distribución por sector</p>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { key: 'maquinas', label: 'Máquinas', icon: Wrench, color: '#22d3ee' },
+                { key: 'cubierta', label: 'Cubierta', icon: Anchor, color: '#34d399' },
+                { key: 'puente',   label: 'Puente',   icon: Navigation, color: '#c084fc' },
+              ].map(s => {
+                const Icon = s.icon
+                const count = metricas.sectorCount[s.key]
+                const pct = metricas.onboardingCompleto > 0
+                  ? Math.round((count / metricas.onboardingCompleto) * 100)
+                  : 0
+                return (
+                  <div key={s.key} className="bg-navy-700/50 border border-navy-600 rounded-xl p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Icon size={14} style={{ color: s.color }} />
+                      <span className="text-xs text-slate-400">{s.label}</span>
+                    </div>
+                    <p className="text-xl font-black" style={{ color: s.color }}>{count}</p>
+                    <div className="mt-2 h-1.5 rounded-full bg-navy-600 overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: s.color }} />
+                    </div>
+                    <p className="text-xs text-slate-600 mt-1">{pct}%</p>
+                  </div>
+                )
+              })}
+            </div>
+            {metricas.sectorCount.sinSector > 0 && (
+              <p className="text-xs text-slate-600 mt-2">{metricas.sectorCount.sinSector} usuarios sin sector asignado aún</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Gestión sponsors */}
       <div className="card">
@@ -324,6 +396,7 @@ export default function AdminPanel() {
               <thead>
                 <tr className="border-b border-navy-700">
                   <th className="text-left text-xs text-slate-400 uppercase tracking-wider pb-3 pr-4">Email</th>
+                  <th className="text-left text-xs text-slate-400 uppercase tracking-wider pb-3 px-2">Sector</th>
                   <th className="text-right text-xs text-slate-400 uppercase tracking-wider pb-3 px-4">Viajes</th>
                   <th className="text-right text-xs text-slate-400 uppercase tracking-wider pb-3 px-4">Cajones</th>
                   <th className="text-right text-xs text-slate-400 uppercase tracking-wider pb-3 px-4">Registrado</th>
@@ -331,15 +404,26 @@ export default function AdminPanel() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-navy-700">
-                {usuarios.map(u => (
+                {usuarios.map(u => {
+                  const sectorColor = { maquinas: '#22d3ee', cubierta: '#34d399', puente: '#c084fc' }
+                  return (
                   <tr key={u.uid} className={`hover:bg-navy-700/30 transition-colors ${u.sinDocumento ? 'opacity-60' : ''}`}>
                     <td className="py-3 pr-4">
-                      <span className={`text-sm font-medium ${u.email === 'alangambacorta7@gmail.com' ? 'text-yellow-400' : u.sinDocumento ? 'text-slate-500 italic' : 'text-slate-300'}`}>
-                        {u.email}
-                        {u.email === 'alangambacorta7@gmail.com' && (
-                          <span className="ml-2 text-xs bg-yellow-500/15 text-yellow-400 border border-yellow-500/20 px-2 py-0.5 rounded-full">admin</span>
-                        )}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {u.activoUltimos30 && <span style={{width:6,height:6,borderRadius:'50%',background:'#34d399',flexShrink:0,display:'inline-block'}} title="Activo últimos 30 días" />}
+                        <span className={`text-sm font-medium ${u.email === 'alangambacorta7@gmail.com' ? 'text-yellow-400' : u.sinDocumento ? 'text-slate-500 italic' : 'text-slate-300'}`}>
+                          {u.email}
+                          {u.email === 'alangambacorta7@gmail.com' && (
+                            <span className="ml-2 text-xs bg-yellow-500/15 text-yellow-400 border border-yellow-500/20 px-2 py-0.5 rounded-full">admin</span>
+                          )}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-2">
+                      {u.sector
+                        ? <span style={{fontSize:10,padding:'2px 7px',borderRadius:6,fontWeight:700,background:`${sectorColor[u.sector]}18`,color:sectorColor[u.sector],border:`1px solid ${sectorColor[u.sector]}40`}}>{u.sector}</span>
+                        : <span className="text-xs text-slate-600">—</span>
+                      }
                     </td>
                     <td className="py-3 px-4 text-right">
                       <span className="text-cyan-400 font-semibold">{u.totalViajes}</span>
@@ -350,7 +434,8 @@ export default function AdminPanel() {
                     <td className="py-3 px-4 text-right text-xs text-slate-500">{fmtFechaCorta(u.registradoEn)}</td>
                     <td className="py-3 pl-4 text-right text-xs text-slate-400">{fmtFechaCorta(u.ultimoAcceso)}</td>
                   </tr>
-                ))}
+                )})}
+
               </tbody>
               <tfoot>
                 <tr className="border-t border-navy-600">

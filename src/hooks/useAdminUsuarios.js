@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { collection, collectionGroup, getDocsFromServer } from 'firebase/firestore'
+import { collection, collectionGroup, getDocsFromServer, doc, getDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 
 export function useAdminUsuarios() {
   const [usuarios, setUsuarios] = useState([])
+  const [metricas, setMetricas] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState(null)
 
@@ -24,23 +25,42 @@ export function useAdminUsuarios() {
         viajesPorUid[uid].push(d.data())
       })
 
-      // Usuarios con documento padre (tienen email y fechas)
+      // Fetch perfiles en paralelo
+      const uids = usuariosSnap.docs.map(d => d.id)
+      const perfilesSnaps = await Promise.all(
+        uids.map(uid => getDoc(doc(db, 'usuarios', uid, 'config', 'perfil')))
+      )
+      const perfilesPorUid = {}
+      perfilesSnaps.forEach((snap, i) => {
+        if (snap.exists()) perfilesPorUid[uids[i]] = snap.data()
+      })
+
+      // Usuarios con documento padre
       const usuariosConDoc = {}
-      usuariosSnap.docs.forEach(doc => {
-        const datos = doc.data()
-        const viajes = viajesPorUid[doc.id] || []
-        usuariosConDoc[doc.id] = {
-          uid: doc.id,
+      usuariosSnap.docs.forEach(d => {
+        const datos = d.data()
+        const viajes = viajesPorUid[d.id] || []
+        const perfil = perfilesPorUid[d.id] || null
+        const ahora = new Date()
+        const diasDesdeAcceso = datos.ultimoAcceso
+          ? Math.ceil((ahora - datos.ultimoAcceso.toDate()) / (1000 * 60 * 60 * 24))
+          : null
+        usuariosConDoc[d.id] = {
+          uid: d.id,
           email: datos.email || '(sin email)',
           registradoEn: datos.registradoEn?.toDate?.() || null,
           ultimoAcceso: datos.ultimoAcceso?.toDate?.() || null,
           totalViajes: viajes.length,
           totalCajones: viajes.reduce((s, v) => s + (Number(v.cajones) || 0), 0),
+          sector: perfil?.sector || null,
+          rango: perfil?.rango || null,
+          onboardingCompleto: perfil?.completado === true,
+          activoUltimos30: diasDesdeAcceso !== null && diasDesdeAcceso <= 30,
           sinDocumento: false,
         }
       })
 
-      // Usuarios encontrados solo en viajes (sin documento padre — registrados antes del fix)
+      // Usuarios solo en viajes (sin documento padre)
       Object.keys(viajesPorUid).forEach(uid => {
         if (!usuariosConDoc[uid]) {
           const viajes = viajesPorUid[uid]
@@ -51,19 +71,40 @@ export function useAdminUsuarios() {
             ultimoAcceso: null,
             totalViajes: viajes.length,
             totalCajones: viajes.reduce((s, v) => s + (Number(v.cajones) || 0), 0),
+            sector: null,
+            rango: null,
+            onboardingCompleto: false,
+            activoUltimos30: false,
             sinDocumento: true,
           }
         }
       })
 
-      const lista = Object.values(usuariosConDoc)
-        .sort((a, b) => {
-          // Con doc y acceso reciente primero, luego sin doc
-          if (a.ultimoAcceso && b.ultimoAcceso) return b.ultimoAcceso - a.ultimoAcceso
-          if (a.ultimoAcceso) return -1
-          if (b.ultimoAcceso) return 1
-          return b.totalViajes - a.totalViajes
-        })
+      const lista = Object.values(usuariosConDoc).sort((a, b) => {
+        if (a.ultimoAcceso && b.ultimoAcceso) return b.ultimoAcceso - a.ultimoAcceso
+        if (a.ultimoAcceso) return -1
+        if (b.ultimoAcceso) return 1
+        return b.totalViajes - a.totalViajes
+      })
+
+      // Calcular métricas agregadas
+      const sectorCount = { maquinas: 0, cubierta: 0, puente: 0, sinSector: 0 }
+      lista.forEach(u => {
+        if (u.sector === 'maquinas') sectorCount.maquinas++
+        else if (u.sector === 'cubierta') sectorCount.cubierta++
+        else if (u.sector === 'puente') sectorCount.puente++
+        else sectorCount.sinSector++
+      })
+
+      setMetricas({
+        totalUsuarios: lista.length,
+        onboardingCompleto: lista.filter(u => u.onboardingCompleto).length,
+        activosUltimos30: lista.filter(u => u.activoUltimos30).length,
+        conViajes: lista.filter(u => u.totalViajes > 0).length,
+        sectorCount,
+        totalViajes: lista.reduce((s, u) => s + u.totalViajes, 0),
+        totalCajones: lista.reduce((s, u) => s + u.totalCajones, 0),
+      })
 
       setUsuarios(lista)
     } catch (e) {
@@ -76,5 +117,5 @@ export function useAdminUsuarios() {
 
   useEffect(() => { cargar() }, [])
 
-  return { usuarios, cargando, error, recargar: cargar }
+  return { usuarios, metricas, cargando, error, recargar: cargar }
 }
