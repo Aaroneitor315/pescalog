@@ -10,10 +10,12 @@ import AdminPanel from './components/AdminPanel'
 import Calculadora from './components/Calculadora'
 import PanelMaquinista from './components/PanelMaquinista'
 import NetworkBanner from './components/NetworkBanner'
+import Onboarding from './components/Onboarding'
 import { useViajes } from './hooks/useViajes'
 import { usePrecios } from './hooks/usePrecios'
 import { useLibreta } from './hooks/useLibreta'
 import { useAuth } from './hooks/useAuth'
+import { usePerfil } from './hooks/usePerfil'
 
 export default function App() {
   const { user, loading, cerrarSesion } = useAuth()
@@ -22,6 +24,7 @@ export default function App() {
   const [sectorAbierto, setSectorAbierto] = useState(null)
 
   const uid = user?.uid || null
+  const { perfil, cargando: cargandoPerfil, guardarPerfil } = usePerfil(uid)
   const { viajes, agregarViaje, eliminarViaje, editarViaje } = useViajes(uid)
   const { config, setPrecioEspecie, setTipoCambio, guardarTodos, calcularTotalViaje } = usePrecios(uid)
   const { libreta, actualizarPerfil, actualizarDocumento, agregarDocumento, eliminarDocumento } = useLibreta(uid)
@@ -41,7 +44,7 @@ export default function App() {
     setTab('nuevo')
   }
 
-  if (loading) {
+  if (loading || cargandoPerfil) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-slate-400 animate-pulse">Cargando...</div>
@@ -53,10 +56,14 @@ export default function App() {
     return <Login />
   }
 
+  if (!perfil?.completado) {
+    return <Onboarding onGuardar={guardarPerfil} />
+  }
+
   return (
     <div className="min-h-screen">
       <NetworkBanner />
-      <Navbar tab={tab} setTab={setTab} user={user} onCerrarSesion={cerrarSesion} />
+      <Navbar tab={tab} setTab={setTab} user={user} onCerrarSesion={cerrarSesion} perfil={perfil} />
 
       {/* Panel sectores a bordo */}
       {sectorAbierto && (
@@ -77,6 +84,7 @@ export default function App() {
             config={config}
             onAbrirSector={setSectorAbierto}
             onNuevoViaje={() => setTab('nuevo')}
+            perfil={perfil}
           />
         )}
         {tab === 'historial' && (

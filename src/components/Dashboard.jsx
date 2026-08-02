@@ -167,7 +167,7 @@ const SECTORES_INFO = [
   },
 ]
 
-export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirSector, onNuevoViaje }) {
+export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirSector, onNuevoViaje, perfil }) {
   const especies = useMemo(() => {
     const set = new Set(viajes.map(v => v.especie))
     return ['todas', ...Array.from(set).sort()]
@@ -263,20 +263,29 @@ export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirS
         <div>
           <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-3">Stock por sector</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {SECTORES_INFO.map(s => {
+            {[...SECTORES_INFO].sort((a, b) => {
+              if (perfil?.sector === a.id) return -1
+              if (perfil?.sector === b.id) return 1
+              return 0
+            }).map(s => {
               const { Icon } = s
+              const esMio = perfil?.sector === s.id
               return (
                 <button key={s.id} onClick={() => onAbrirSector(s.id)}
                   className="card text-left transition-colors group p-5"
-                  style={{ borderLeft: `4px solid ${s.color}`, borderTop: 'none', borderRight: 'none', borderBottom: 'none', borderRadius: '0 12px 12px 0' }}>
+                  style={{ borderLeft: `4px solid ${s.color}`, borderTop: esMio ? `1px solid ${s.color}40` : 'none', borderRight: esMio ? `1px solid ${s.color}40` : 'none', borderBottom: esMio ? `1px solid ${s.color}40` : 'none', borderRadius: '0 12px 12px 0', background: esMio ? s.color + '0a' : undefined }}>
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
                       style={{ background: s.color + '18', border: `1.5px solid ${s.color}40` }}>
                       <Icon size={28} className={s.textColor} />
                     </div>
                     <div>
-                      <p className={`text-base font-bold ${s.textColor}`}>{s.label}</p>
+                      <div className="flex items-center gap-2">
+                        <p className={`text-base font-bold ${s.textColor}`}>{s.label}</p>
+                        {esMio && <span style={{fontSize:9,padding:'2px 7px',borderRadius:6,fontWeight:700,background:s.color+'20',color:s.color,border:`1px solid ${s.color}40`}}>Tu sector</span>}
+                      </div>
                       <p className="text-xs text-slate-500 mt-0.5">{s.sub}</p>
+                      {esMio && perfil.rango && <p className="text-xs mt-1" style={{color:s.color+'99'}}>{perfil.rango}</p>}
                     </div>
                   </div>
                 </button>
@@ -421,26 +430,39 @@ export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirS
       <div>
         <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-3">Stock por sector</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {SECTORES_INFO.map(s => {
+          {[...SECTORES_INFO].sort((a, b) => {
+            if (perfil?.sector === a.id) return -1
+            if (perfil?.sector === b.id) return 1
+            return 0
+          }).map(s => {
             const { Icon } = s
+            const esMio = perfil?.sector === s.id
             return (
               <button
                 key={s.id}
                 onClick={() => onAbrirSector(s.id)}
                 className="card text-left transition-colors group p-5"
-                style={{ borderLeft: `4px solid ${s.color}`, borderTop: 'none', borderRight: 'none', borderBottom: 'none', borderRadius: '0 12px 12px 0' }}
+                style={{
+                  borderLeft: `4px solid ${s.color}`,
+                  borderTop: esMio ? `1px solid ${s.color}40` : 'none',
+                  borderRight: esMio ? `1px solid ${s.color}40` : 'none',
+                  borderBottom: esMio ? `1px solid ${s.color}40` : 'none',
+                  borderRadius: '0 12px 12px 0',
+                  background: esMio ? s.color + '0a' : undefined,
+                }}
               >
                 <div className="flex items-center gap-4">
-                  <div
-                    className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105"
-                    style={{ background: s.color + '18', border: `1.5px solid ${s.color}40` }}
-                  >
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105"
+                    style={{ background: s.color + '18', border: `1.5px solid ${s.color}40` }}>
                     <Icon size={28} className={s.textColor} />
                   </div>
                   <div>
-                    <p className={`text-base font-bold ${s.textColor}`}>{s.label}</p>
+                    <div className="flex items-center gap-2">
+                      <p className={`text-base font-bold ${s.textColor}`}>{s.label}</p>
+                      {esMio && <span style={{fontSize:9,padding:'2px 7px',borderRadius:6,fontWeight:700,background:s.color+'20',color:s.color,border:`1px solid ${s.color}40`}}>Tu sector</span>}
+                    </div>
                     <p className="text-xs text-slate-500 mt-0.5">{s.sub}</p>
-                    <p className="text-xs text-slate-600 mt-1">Tocá para ver stock →</p>
+                    {esMio && perfil.rango && <p className="text-xs mt-1" style={{color:s.color+'99'}}>{perfil.rango}</p>}
                   </div>
                 </div>
               </button>

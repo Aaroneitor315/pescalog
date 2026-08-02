@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { LogOut, Shield, BarChart2, List, Plus, BookOpen, MoreHorizontal, DollarSign, Calculator, X } from 'lucide-react'
 import { esAdmin } from '../hooks/useAdmin'
+import { SECTORES } from '../hooks/usePerfil'
 
 const TABS_DESKTOP = [
   { id: 'dashboard', label: 'Principal', main: true },
@@ -25,7 +26,7 @@ const TABS_MAS = [
   { id: 'liquidacion', label: 'Calculadora', icon: Calculator },
 ]
 
-export default function Navbar({ tab, setTab, user, onCerrarSesion }) {
+export default function Navbar({ tab, setTab, user, onCerrarSesion, perfil }) {
   const admin = esAdmin(user)
   const [masAbierto, setMasAbierto] = useState(false)
 
@@ -45,7 +46,26 @@ export default function Navbar({ tab, setTab, user, onCerrarSesion }) {
           <img src="/logo.png" alt="BitácoraAR" style={{height:56,width:'auto',objectFit:'contain'}} />
           {user && (
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium hidden sm:block truncate max-w-[160px]" style={{color:'#0e7490'}}>{user.email}</span>
+              {perfil && (
+                <div className="hidden sm:flex flex-col items-end gap-0.5">
+                  <span className="text-xs font-medium truncate max-w-[140px]" style={{color:'#0e7490'}}>{user.email}</span>
+                  <div className="flex gap-1">
+                    {perfil.sector && SECTORES[perfil.sector] && (
+                      <span style={{
+                        fontSize:9,padding:'2px 7px',borderRadius:6,fontWeight:700,
+                        background: SECTORES[perfil.sector].bg,
+                        color: SECTORES[perfil.sector].color,
+                        border: `1px solid ${SECTORES[perfil.sector].border}40`,
+                      }}>{SECTORES[perfil.sector].label}</span>
+                    )}
+                    {perfil.rango && (
+                      <span style={{fontSize:9,padding:'2px 7px',borderRadius:6,fontWeight:700,background:'#1e2d42',color:'#64748b',border:'1px solid #33415540'}}>
+                        {perfil.rango}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
               <div style={{
                 width:34,height:34,borderRadius:'50%',
                 background:'linear-gradient(135deg,#0891b2,#06b6d4)',
@@ -53,7 +73,7 @@ export default function Navbar({ tab, setTab, user, onCerrarSesion }) {
                 fontSize:13,fontWeight:800,color:'#fff',flexShrink:0,
                 boxShadow:'0 2px 8px rgba(6,182,212,0.35)',
               }}>
-                {(user.email?.[0] || 'U').toUpperCase()}
+                {perfil?.sector ? SECTORES[perfil.sector]?.emoji : (user.email?.[0] || 'U').toUpperCase()}
               </div>
             </div>
           )}
