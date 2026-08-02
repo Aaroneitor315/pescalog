@@ -9,6 +9,7 @@ import Login from './components/Login'
 import AdminPanel from './components/AdminPanel'
 import Calculadora from './components/Calculadora'
 import PanelMaquinista from './components/PanelMaquinista'
+import NetworkBanner from './components/NetworkBanner'
 import { useViajes } from './hooks/useViajes'
 import { usePrecios } from './hooks/usePrecios'
 import { useLibreta } from './hooks/useLibreta'
@@ -54,6 +55,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
+      <NetworkBanner />
       <Navbar tab={tab} setTab={setTab} user={user} onCerrarSesion={cerrarSesion} />
 
       {/* Panel sectores a bordo */}
