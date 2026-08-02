@@ -109,6 +109,11 @@ export default function Navbar({ tab, setTab, user, onCerrarSesion, perfil }) {
                 <Shield size={13} className="text-yellow-400" /> Admin
               </button>
             )}
+            <button onClick={onCerrarSesion}
+              className="nav-tab whitespace-nowrap flex items-center gap-1.5 ml-2"
+              style={{color:'#f87171',borderColor:'#f8717130',border:'1px solid'}}>
+              <LogOut size={13} /> Cerrar sesión
+            </button>
           </nav>
         </div>
       </header>
