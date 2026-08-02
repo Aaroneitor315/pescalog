@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import Sponsors from './Sponsors'
-import { TrendingUp, Fish, Package, Award, DollarSign, Banknote, Waves, Eye, EyeOff, RefreshCw } from 'lucide-react'
+import { TrendingUp, Fish, Package, Award, DollarSign, Banknote, Waves, Eye, EyeOff, RefreshCw, Plus } from 'lucide-react'
 import { calcularSingladuras } from '../hooks/useViajes'
 import { useDolar } from '../hooks/useDolar'
 
