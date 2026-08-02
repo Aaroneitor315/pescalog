@@ -11,6 +11,7 @@ import Calculadora from './components/Calculadora'
 import PanelMaquinista from './components/PanelMaquinista'
 import NetworkBanner from './components/NetworkBanner'
 import Onboarding from './components/Onboarding'
+import BannerVencimientos from './components/BannerVencimientos'
 import { useViajes } from './hooks/useViajes'
 import { usePrecios } from './hooks/usePrecios'
 import { useLibreta } from './hooks/useLibreta'
@@ -60,10 +61,19 @@ export default function App() {
     return <Onboarding onGuardar={guardarPerfil} />
   }
 
+  function contarAlertasLibreta() {
+    return libreta.documentos.filter(d => {
+      if (!d.vencimiento) return false
+      const dias = Math.ceil((new Date(d.vencimiento) - new Date()) / (1000 * 60 * 60 * 24))
+      return dias < 0 || dias <= 60
+    }).length
+  }
+
   return (
     <div className="min-h-screen">
       <NetworkBanner />
-      <Navbar tab={tab} setTab={setTab} user={user} onCerrarSesion={cerrarSesion} perfil={perfil} />
+      <BannerVencimientos documentos={libreta.documentos} onIrLibreta={() => setTab('libreta')} />
+      <Navbar tab={tab} setTab={setTab} user={user} onCerrarSesion={cerrarSesion} perfil={perfil} alertasLibreta={contarAlertasLibreta()} />
 
       {/* Panel sectores a bordo */}
       {sectorAbierto && (

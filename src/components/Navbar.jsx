@@ -16,7 +16,7 @@ const TABS_BOTTOM = [
   { id: 'dashboard', label: 'Principal', icon: BarChart2 },
   { id: 'historial', label: 'Historial', icon: List },
   { id: 'nuevo', label: null, icon: Plus, fab: true },
-  { id: 'libreta', label: 'Libreta', icon: BookOpen },
+  { id: 'libreta', label: 'Libreta', icon: BookOpen, badge: true },
   { id: 'mas', label: 'Más', icon: MoreHorizontal },
 ]
 
@@ -26,7 +26,7 @@ const TABS_MAS = [
   { id: 'liquidacion', label: 'Calculadora', icon: Calculator },
 ]
 
-export default function Navbar({ tab, setTab, user, onCerrarSesion, perfil }) {
+export default function Navbar({ tab, setTab, user, onCerrarSesion, perfil, alertasLibreta = 0 }) {
   const admin = esAdmin(user)
   const [masAbierto, setMasAbierto] = useState(false)
 
@@ -202,20 +202,33 @@ export default function Navbar({ tab, setTab, user, onCerrarSesion, perfil }) {
 
             const active = tab === t.id
             const isPrincipal = t.id === 'dashboard'
+            const showBadge = t.badge && alertasLibreta > 0
             return (
               <button key={t.id} onClick={() => irA(t.id)}
                 className="flex flex-col items-center gap-1 py-1 px-3" style={{position:'relative'}}>
                 {active && <span style={{position:'absolute',top:0,left:'50%',transform:'translateX(-50%)',width:20,height:3,borderRadius:2,background:'#06b6d4',transition:'left 0.2s'}} />}
-                <div style={{
-                  width: 32, height: 32, borderRadius: isPrincipal ? 10 : 8,
-                  background: active
-                    ? isPrincipal ? 'linear-gradient(135deg,#06b6d4,#0891b2)' : 'rgba(6,182,212,0.15)'
-                    : isPrincipal ? 'rgba(6,182,212,0.12)' : 'transparent',
-                  border: isPrincipal ? (active ? 'none' : '1px solid rgba(6,182,212,0.3)') : 'none',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: active && isPrincipal ? '0 0 10px rgba(6,182,212,0.5)' : 'none',
-                }}>
-                  <Icon size={20} color={active || isPrincipal ? '#06b6d4' : '#64748b'} />
+                <div style={{position:'relative',width:32,height:32}}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: isPrincipal ? 10 : 8,
+                    background: active
+                      ? isPrincipal ? 'linear-gradient(135deg,#06b6d4,#0891b2)' : 'rgba(6,182,212,0.15)'
+                      : isPrincipal ? 'rgba(6,182,212,0.12)' : 'transparent',
+                    border: isPrincipal ? (active ? 'none' : '1px solid rgba(6,182,212,0.3)') : 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: active && isPrincipal ? '0 0 10px rgba(6,182,212,0.5)' : 'none',
+                  }}>
+                    <Icon size={20} color={active || isPrincipal ? '#06b6d4' : '#64748b'} />
+                  </div>
+                  {showBadge && (
+                    <span style={{
+                      position:'absolute',top:1,right:1,
+                      minWidth:14,height:14,borderRadius:7,
+                      background:'#ef4444',border:'2px solid #080f1a',
+                      fontSize:8,fontWeight:800,color:'#fff',
+                      display:'flex',alignItems:'center',justifyContent:'center',
+                      lineHeight:1,padding:'0 2px',
+                    }}>{alertasLibreta > 9 ? '9+' : alertasLibreta}</span>
+                  )}
                 </div>
                 <span style={{ fontSize: 9, fontWeight: isPrincipal ? 700 : 400, color: active ? '#06b6d4' : isPrincipal ? '#0891b2' : '#64748b' }}>{t.label}</span>
               </button>
