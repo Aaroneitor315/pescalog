@@ -297,12 +297,68 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
               </div>
             )}
 
+            {/* Mini stats siempre visibles */}
+            <div className="grid grid-cols-3 gap-0 border-b border-navy-700 mx-0">
+              {[
+                { label: 'Ítems', val: repuestos.length, color: '#94a3b8' },
+                { label: 'En stock', val: repuestos.reduce((s,r) => s + r.stockActual, 0), color: '#34d399' },
+                { label: 'Alertas', val: pendientes.length, color: pendientes.length > 0 ? '#f87171' : '#94a3b8' },
+              ].map((s, i) => (
+                <div key={s.label} className="text-center py-3" style={{borderRight: i < 2 ? '1px solid #112240' : 'none'}}>
+                  <p className="text-xl font-black" style={{color: s.color}}>{cargando ? '—' : s.val}</p>
+                  <p className="text-[10px] text-slate-600 uppercase tracking-wider font-medium">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Cabecera de columnas */}
+            <div className="flex items-center gap-3 px-4 py-2 border-b border-navy-700/50">
+              <div className="w-10 flex-shrink-0" />
+              <div className="flex-1 text-[10px] text-slate-600 uppercase tracking-wider font-semibold">Código · Descripción</div>
+              <div className="text-[10px] text-slate-600 uppercase tracking-wider font-semibold w-16 text-center">Stock</div>
+              <div className="text-[10px] text-slate-600 uppercase tracking-wider font-semibold w-12 text-center">Estado</div>
+              <div className="w-12" />
+            </div>
+
             {/* Lista de repuestos */}
             {cargando ? (
-              <div className="text-center py-12 text-slate-500 text-sm">Cargando...</div>
+              <div className="divide-y divide-navy-700">
+                {[0,1,2].map(i => (
+                  <div key={i} className="flex items-center gap-3 px-4 py-3 animate-pulse">
+                    <div className="w-10 h-10 rounded-lg bg-navy-700 flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3 bg-navy-700 rounded w-24" />
+                      <div className="h-2 bg-navy-700 rounded w-36" />
+                    </div>
+                    <div className="h-5 bg-navy-700 rounded w-16" />
+                    <div className="h-5 bg-navy-700 rounded w-12" />
+                  </div>
+                ))}
+              </div>
             ) : repuestos.length === 0 ? (
-              <div className="text-center py-12 text-slate-600 text-sm px-8">
-                Todavía no hay repuestos.<br />Fotografiá el primero con el botón de arriba.
+              <div>
+                {/* Skeleton fantasma — 3 filas vacías */}
+                {[0,1,2].map(i => (
+                  <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-navy-700/30" style={{opacity: 1 - i * 0.25}}>
+                    <div className="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center" style={{background:'#112240',border:'1px dashed #1e3a5f'}}>
+                      <span className="text-slate-700 text-xs">IMG</span>
+                    </div>
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3 rounded" style={{background:'#112240',width: i === 0 ? '40%' : i === 1 ? '55%' : '35%'}} />
+                      <div className="h-2 rounded" style={{background:'#0d1829',width: i === 0 ? '60%' : i === 1 ? '45%' : '50%'}} />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-7 h-7 rounded-lg" style={{background:'#112240'}} />
+                      <div className="w-5 h-5 rounded" style={{background:'#0d1829'}} />
+                      <div className="w-7 h-7 rounded-lg" style={{background:'#112240'}} />
+                    </div>
+                    <div className="w-12 h-5 rounded-full" style={{background:'#112240'}} />
+                  </div>
+                ))}
+                <div className="text-center py-6 px-8">
+                  <p className="text-slate-600 text-xs">La planilla se completa al cargar el primer repuesto</p>
+                  <p className="text-slate-700 text-xs mt-1">Usá el botón de cámara para empezar</p>
+                </div>
               </div>
             ) : (
               <div className="divide-y divide-navy-700">

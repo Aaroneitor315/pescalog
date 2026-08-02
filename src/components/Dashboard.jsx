@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import Sponsors from './Sponsors'
-import { TrendingUp, Fish, Package, Award, DollarSign, Banknote, Waves, Eye, EyeOff, RefreshCw, Plus } from 'lucide-react'
+import { TrendingUp, Fish, Package, Award, DollarSign, Banknote, Waves, Eye, EyeOff, RefreshCw, Plus, Lock } from 'lucide-react'
 import { calcularSingladuras } from '../hooks/useViajes'
 import { useDolar } from '../hooks/useDolar'
 
@@ -270,21 +270,23 @@ export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirS
             }).map(s => {
               const { Icon } = s
               const esMio = perfil?.sector === s.id
+              const bloqueado = perfil?.sector && !esMio
               return (
-                <button key={s.id} onClick={() => onAbrirSector(s.id)}
+                <button key={s.id}
+                  onClick={() => !bloqueado && onAbrirSector(s.id)}
                   className="card text-left transition-colors group p-5"
-                  style={{ borderLeft: `4px solid ${s.color}`, borderTop: esMio ? `1px solid ${s.color}40` : 'none', borderRight: esMio ? `1px solid ${s.color}40` : 'none', borderBottom: esMio ? `1px solid ${s.color}40` : 'none', borderRadius: '0 12px 12px 0', background: esMio ? s.color + '0a' : undefined }}>
+                  style={{ borderLeft: `4px solid ${bloqueado ? '#1e2d42' : s.color}`, borderTop: esMio ? `1px solid ${s.color}40` : '1px solid #1e2d4260', borderRight: esMio ? `1px solid ${s.color}40` : '1px solid #1e2d4260', borderBottom: esMio ? `1px solid ${s.color}40` : '1px solid #1e2d4260', borderRadius: '0 12px 12px 0', background: esMio ? s.color + '0a' : '#0d182940', opacity: bloqueado ? 0.45 : 1, cursor: bloqueado ? 'not-allowed' : 'pointer' }}>
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: s.color + '18', border: `1.5px solid ${s.color}40` }}>
-                      <Icon size={28} className={s.textColor} />
+                      style={{ background: s.color + (bloqueado ? '0a' : '18'), border: `1.5px solid ${s.color}${bloqueado ? '20' : '40'}` }}>
+                      {bloqueado ? <Lock size={22} className="text-slate-600" /> : <Icon size={28} className={s.textColor} />}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className={`text-base font-bold ${s.textColor}`}>{s.label}</p>
+                        <p className={`text-base font-bold ${bloqueado ? 'text-slate-600' : s.textColor}`}>{s.label}</p>
                         {esMio && <span style={{fontSize:9,padding:'2px 7px',borderRadius:6,fontWeight:700,background:s.color+'20',color:s.color,border:`1px solid ${s.color}40`}}>Tu sector</span>}
                       </div>
-                      <p className="text-xs text-slate-500 mt-0.5">{s.sub}</p>
+                      <p className="text-xs mt-0.5" style={{color: bloqueado ? '#1e3a5f' : '#64748b'}}>{bloqueado ? 'Acceso restringido a tu sector' : s.sub}</p>
                       {esMio && perfil.rango && <p className="text-xs mt-1" style={{color:s.color+'99'}}>{perfil.rango}</p>}
                     </div>
                   </div>
@@ -437,31 +439,34 @@ export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirS
           }).map(s => {
             const { Icon } = s
             const esMio = perfil?.sector === s.id
+            const bloqueado = perfil?.sector && !esMio
             return (
               <button
                 key={s.id}
-                onClick={() => onAbrirSector(s.id)}
+                onClick={() => !bloqueado && onAbrirSector(s.id)}
                 className="card text-left transition-colors group p-5"
                 style={{
-                  borderLeft: `4px solid ${s.color}`,
-                  borderTop: esMio ? `1px solid ${s.color}40` : 'none',
-                  borderRight: esMio ? `1px solid ${s.color}40` : 'none',
-                  borderBottom: esMio ? `1px solid ${s.color}40` : 'none',
+                  borderLeft: `4px solid ${bloqueado ? '#1e2d42' : s.color}`,
+                  borderTop: esMio ? `1px solid ${s.color}40` : '1px solid #1e2d4260',
+                  borderRight: esMio ? `1px solid ${s.color}40` : '1px solid #1e2d4260',
+                  borderBottom: esMio ? `1px solid ${s.color}40` : '1px solid #1e2d4260',
                   borderRadius: '0 12px 12px 0',
-                  background: esMio ? s.color + '0a' : undefined,
+                  background: esMio ? s.color + '0a' : '#0d182940',
+                  opacity: bloqueado ? 0.45 : 1,
+                  cursor: bloqueado ? 'not-allowed' : 'pointer',
                 }}
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105"
-                    style={{ background: s.color + '18', border: `1.5px solid ${s.color}40` }}>
-                    <Icon size={28} className={s.textColor} />
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: s.color + (bloqueado ? '0a' : '18'), border: `1.5px solid ${s.color}${bloqueado ? '20' : '40'}` }}>
+                    {bloqueado ? <Lock size={22} className="text-slate-600" /> : <Icon size={28} className={s.textColor} />}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className={`text-base font-bold ${s.textColor}`}>{s.label}</p>
+                      <p className={`text-base font-bold ${bloqueado ? 'text-slate-600' : s.textColor}`}>{s.label}</p>
                       {esMio && <span style={{fontSize:9,padding:'2px 7px',borderRadius:6,fontWeight:700,background:s.color+'20',color:s.color,border:`1px solid ${s.color}40`}}>Tu sector</span>}
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5">{s.sub}</p>
+                    <p className="text-xs mt-0.5" style={{color: bloqueado ? '#1e3a5f' : '#64748b'}}>{bloqueado ? 'Acceso restringido a tu sector' : s.sub}</p>
                     {esMio && perfil.rango && <p className="text-xs mt-1" style={{color:s.color+'99'}}>{perfil.rango}</p>}
                   </div>
                 </div>
