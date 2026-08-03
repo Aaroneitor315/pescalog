@@ -73,8 +73,27 @@ async function eliminarFotoStorage(url) {
 }
 
 function extraerCodigo(texto) {
-  const match = texto.match(/[A-Z]{1,3}[\s-]?\d{4,8}[A-Z0-9]*/i)
-  return match ? match[0].replace(/\s/g, '').toUpperCase() : ''
+  // Corregir confusiones comunes de OCR en códigos industriales
+  const normalizado = texto
+    .replace(/\bO\b/g, '0')
+    .replace(/[|l]/g, '1')
+    .replace(/\bS\b/g, '5')
+    .replace(/\bB\b/g, '8')
+
+  const patrones = [
+    /[A-Z]{1,4}[-.\s]?\d{3,8}[-.\s]?[A-Z0-9]{0,4}/i,
+    /\d{4,10}[A-Z]{0,3}/i,
+    /[A-Z]{2,5}\d{2,6}/i,
+  ]
+
+  for (const patron of patrones) {
+    const match = normalizado.match(patron)
+    if (match) {
+      const codigo = match[0].replace(/[\s.]/g, '').toUpperCase()
+      if (codigo.length >= 4) return codigo
+    }
+  }
+  return ''
 }
 
 function colorStock(qty, min) {
@@ -186,6 +205,10 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     setForm(f => ({ ...f, fotoBlob: blob, fotoPreview: preview, foto: preview }))
     try {
       const worker = await createWorker('eng')
+      await worker.setParameters({
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-/',
+        tessedit_pageseg_mode: '6',
+      })
       const { data: { text } } = await worker.recognize(file)
       await worker.terminate()
       const codigo = extraerCodigo(text)
