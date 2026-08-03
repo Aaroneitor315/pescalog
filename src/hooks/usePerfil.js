@@ -21,7 +21,8 @@ export function usePerfil(uid) {
   const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
-    if (!uid) { setCargando(false); return }
+    if (!uid) { setPerfil(null); setCargando(false); return }
+    setCargando(true)
     const ref = doc(db, 'usuarios', uid, 'config', 'perfil')
     getDoc(ref).then(snap => {
       setPerfil(snap.exists() ? snap.data() : null)
