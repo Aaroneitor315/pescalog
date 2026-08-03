@@ -41,6 +41,35 @@ const SECTORES = {
 
 const CATEGORIAS = ['Filtro aceite', 'Filtro combustible', 'Filtro aire', 'Filtro hidráulico', 'Correa', 'Rodamiento', 'Junta', 'Otro']
 
+function preprocesarImagen(file) {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      // Mantener resolución original para OCR
+      canvas.width = img.width
+      canvas.height = img.height
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0)
+      // Escala de grises + alto contraste
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const d = imageData.data
+      for (let i = 0; i < d.length; i += 4) {
+        // Luminancia perceptual
+        const lum = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2]
+        // Contraste: curva S agresiva (empuja claro→blanco, oscuro→negro)
+        const c = lum < 128
+          ? Math.max(0, lum * 0.6)
+          : Math.min(255, 128 + (lum - 128) * 1.6)
+        d[i] = d[i+1] = d[i+2] = c
+      }
+      ctx.putImageData(imageData, 0, 0)
+      canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.95)
+    }
+    img.src = URL.createObjectURL(file)
+  })
+}
+
 function comprimirFoto(file) {
   return new Promise(resolve => {
     const canvas = document.createElement('canvas')
@@ -204,12 +233,10 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     const preview = URL.createObjectURL(blob)
     setForm(f => ({ ...f, fotoBlob: blob, fotoPreview: preview, foto: preview }))
     try {
+      const imagenProcesada = await preprocesarImagen(file)
       const worker = await createWorker('eng')
-      await worker.setParameters({
-        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-/',
-        tessedit_pageseg_mode: '6',
-      })
-      const { data: { text } } = await worker.recognize(file)
+      await worker.setParameters({ tessedit_pageseg_mode: '11' })
+      const { data: { text } } = await worker.recognize(imagenProcesada)
       await worker.terminate()
       const codigo = extraerCodigo(text)
       setOcr({ activo: true, progreso: false, texto: text.trim(), codigo })
