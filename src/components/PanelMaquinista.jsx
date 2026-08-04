@@ -195,7 +195,8 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
   const sector = SECTORES[seccion] || SECTORES.maquinas
   const { Icon } = sector
   const { repuestos, cargando, agregar, editar, actualizarStock, actualizarCantPedir, eliminar } = useRepuestos(uid, seccion)
-  const [vista, setVista] = useState('stock')
+  const vistaInicial = seccion === 'maquinas' ? 'hud' : seccion === 'cubierta' ? 'arrastre' : seccion === 'puente' ? 'radar' : 'stock'
+  const [vista, setVista] = useState(vistaInicial)
   const [ocr, setOcr] = useState({ activo: false, progreso: false, texto: '', codigo: '' })
   const [form, setForm] = useState({ codigo: '', descripcion: '', marca: '', categoria: 'Filtro aceite', stockActual: 1, stockMinimo: 1, cantPedir: 1, foto: null, fotoBlob: null, fotoPreview: null })
   const [modoAgregar, setModoAgregar] = useState(false)
@@ -205,6 +206,10 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
   const fileRef = useRef()
   const hudRef = useRef()
   const hudRafRef = useRef()
+  const arrastreRef = useRef()
+  const arrastreRafRef = useRef()
+  const radarRef = useRef()
+  const radarRafRef = useRef()
 
   // Ficha técnica motor (solo maquinas)
   const fichaMotorVacia = {
@@ -411,6 +416,147 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     return () => cancelAnimationFrame(hudRafRef.current)
   }, [vista, seccion])
 
+  // ── Animación arrastre (cubierta) ──
+  useEffect(() => {
+    if (vista !== 'arrastre' || seccion !== 'cubierta') return
+    const cv = arrastreRef.current
+    if (!cv) return
+    const ctx = cv.getContext('2d')
+    const W = cv.width, H = cv.height, WY = Math.round(H * .5)
+    let t = 0
+    const peces = []
+    for (let pi = 0; pi < 14; pi++) {
+      peces.push({ fx: 10 + Math.random() * 280, fy: WY + 20 + Math.random() * (H - WY - 40), fvx: 0.18 + Math.random() * 0.22, fvy: (Math.random() - .5) * .08, fr: 1.5 + Math.random() * 1.8, fcap: false })
+    }
+    function txt(c, s, x, y, col, size, align) { c.fillStyle = col; c.font = size + ' "Courier New"'; c.textAlign = align || 'left'; c.textBaseline = 'middle'; c.fillText(s, x, y) }
+    function draw() {
+      ctx.clearRect(0, 0, W, H)
+      // cielo
+      const skyG = ctx.createLinearGradient(0, 0, 0, WY); skyG.addColorStop(0, '#010509'); skyG.addColorStop(1, '#020c1a'); ctx.fillStyle = skyG; ctx.fillRect(0, 0, W, WY)
+      // estrellas
+      const st = [[32,12],[90,8],[160,18],[240,11],[310,16],[60,35],[180,30],[280,22],[400,14]]
+      for (let si = 0; si < st.length; si++) { ctx.globalAlpha = .3 + Math.sin(t * .03 + si * 1.2) * .2; ctx.fillStyle = '#c8e0ff'; ctx.fillRect(st[si][0], st[si][1], 1, 1) }
+      ctx.globalAlpha = 1
+      // agua
+      const seaG = ctx.createLinearGradient(0, WY, 0, H); seaG.addColorStop(0, '#03182e'); seaG.addColorStop(1, '#010c1c'); ctx.fillStyle = seaG; ctx.fillRect(0, WY, W, H - WY)
+      ctx.strokeStyle = 'rgba(10,80,140,0.45)'; ctx.lineWidth = 1.5; ctx.beginPath()
+      for (let ox = 0; ox <= W; ox += 3) { const oy = WY + Math.sin(ox * .06 + t * .04) * 2.5; ox === 0 ? ctx.moveTo(ox, oy) : ctx.lineTo(ox, oy) }
+      ctx.stroke()
+      // casco rojo
+      ctx.fillStyle = '#050e22'; ctx.beginPath(); ctx.moveTo(14, WY); ctx.lineTo(185, WY); ctx.lineTo(183, H - 8); ctx.bezierCurveTo(148, H + 4, 55, H + 4, 20, H - 8); ctx.closePath(); ctx.fill()
+      ctx.fillStyle = '#cc1515'; ctx.beginPath(); ctx.moveTo(14, WY); ctx.lineTo(20, WY - 8); ctx.lineTo(26, WY - 16); ctx.lineTo(36, WY - 24); ctx.lineTo(155, WY - 32); ctx.lineTo(172, WY - 32); ctx.lineTo(180, WY - 26); ctx.lineTo(185, WY); ctx.closePath(); ctx.fill()
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(26, WY - 16); ctx.lineTo(185, WY - 2); ctx.stroke()
+      ctx.fillStyle = '#ffffff'; ctx.font = 'bold 7px "Courier New"'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText('BITACORAAR', 38, WY - 14)
+      // superestructura
+      ctx.fillStyle = '#b8c8d8'; ctx.fillRect(40, WY - 38, 80, 24); ctx.fillStyle = '#d0dde8'; ctx.fillRect(44, WY - 52, 66, 16)
+      // radar
+      ctx.save(); ctx.translate(90, WY - 52); ctx.rotate(t * .04); ctx.strokeStyle = 'rgba(0,212,255,0.8)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(8, 0); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.stroke(); ctx.restore()
+      // warps
+      const wSway = Math.sin(t * .025) * 1.5
+      ctx.shadowColor = '#e8c432'; ctx.shadowBlur = 6; ctx.strokeStyle = '#e8c432'; ctx.lineWidth = 2.5
+      ctx.beginPath(); ctx.moveTo(175, WY); ctx.bezierCurveTo(208, WY + 22 + wSway, 238, WY + 56 + wSway, 260, WY + 72); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(175, WY); ctx.bezierCurveTo(210, WY + 30 + wSway, 244, WY + 72 + wSway, 260, WY + 90); ctx.stroke()
+      ctx.shadowBlur = 0
+      // portones
+      const ptA = 0.3 + Math.sin(t * .02) * 0.03
+      function dp(pcx, pcy, ang) { ctx.save(); ctx.translate(pcx, pcy); ctx.rotate(ang); ctx.fillStyle = '#1a3060'; ctx.fillRect(-5, -18, 10, 36); ctx.shadowColor = '#0a7fff'; ctx.shadowBlur = 10; ctx.strokeStyle = '#0a7fff'; ctx.lineWidth = 2; ctx.strokeRect(-5, -18, 10, 36); ctx.shadowBlur = 0; ctx.restore() }
+      dp(262, WY + 72, ptA); dp(262, WY + 90, -ptA)
+      // malletas
+      ctx.strokeStyle = 'rgba(0,200,255,0.65)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3])
+      ctx.beginPath(); ctx.moveTo(262, WY + 66); ctx.lineTo(288, WY + 60); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(262, WY + 96); ctx.lineTo(288, WY + 102); ctx.stroke()
+      ctx.setLineDash([])
+      // red
+      const nSw = Math.sin(t * .022) * 3
+      const bocaX = 288, bocaYtop = WY + 60, bocaYbot = WY + 102, sacoX = W - 30, sacoY = WY + 81 + nSw
+      ctx.shadowColor = '#00ff9d'; ctx.shadowBlur = 6; ctx.strokeStyle = 'rgba(0,255,157,0.7)'; ctx.lineWidth = 1.5
+      ctx.beginPath(); ctx.moveTo(bocaX, bocaYtop); ctx.bezierCurveTo(bocaX + 60, bocaYtop + nSw, bocaX + 130, sacoY - 10 + nSw, sacoX, sacoY); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(bocaX, bocaYbot); ctx.bezierCurveTo(bocaX + 60, bocaYbot + nSw, bocaX + 130, sacoY + 10 + nSw, sacoX, sacoY); ctx.stroke()
+      ctx.shadowBlur = 0
+      for (let nm = 1; nm < 7; nm++) { const ratio = nm / 7; const nmx = bocaX + ratio * (sacoX - bocaX); const nmy1 = bocaYtop + (sacoY - bocaYtop) * ratio; const nmy2 = bocaYbot + (sacoY - bocaYbot) * ratio; ctx.strokeStyle = 'rgba(0,255,157,' + (0.35 - 0.04 * nm) + ')'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(nmx, nmy1); ctx.lineTo(nmx, nmy2); ctx.stroke() }
+      ctx.shadowColor = '#00ff9d'; ctx.shadowBlur = 8; ctx.strokeStyle = 'rgba(0,255,157,0.9)'; ctx.lineWidth = 2.5
+      ctx.beginPath(); ctx.moveTo(bocaX, bocaYtop); ctx.lineTo(bocaX, bocaYbot); ctx.stroke(); ctx.shadowBlur = 0
+      // peces
+      for (let fi = 0; fi < peces.length; fi++) {
+        const p = peces[fi]; p.fx += p.fvx; p.fy += p.fvy + Math.sin(t * .04 + fi * .8) * .06
+        if (p.fy < WY + 5) p.fy = WY + 5; if (p.fy > H - 8) p.fy = H - 8
+        if (p.fx > sacoX + 5) { p.fx = 8 + Math.random() * 60; p.fy = WY + 20 + Math.random() * (H - WY - 40); p.fcap = false }
+        const netRatio = Math.max(0, (p.fx - bocaX) / (sacoX - bocaX))
+        const netTop = bocaYtop + (sacoY - bocaYtop) * netRatio; const netBot = bocaYbot + (sacoY - bocaYbot) * netRatio
+        if (p.fx >= bocaX && p.fx <= sacoX && p.fy >= netTop - 3 && p.fy <= netBot + 3) p.fcap = true
+        if (p.fy <= WY) continue
+        ctx.globalAlpha = 0.75; ctx.fillStyle = p.fcap ? '#ff6b1a' : '#00d4ff'
+        ctx.beginPath(); ctx.moveTo(p.fx + p.fr * 2, p.fy); ctx.bezierCurveTo(p.fx + p.fr * 2, p.fy - p.fr, p.fx - p.fr, p.fy - p.fr * .7, p.fx - p.fr, p.fy); ctx.bezierCurveTo(p.fx - p.fr, p.fy + p.fr * .7, p.fx + p.fr * 2, p.fy + p.fr, p.fx + p.fr * 2, p.fy); ctx.fill()
+        ctx.beginPath(); ctx.moveTo(p.fx - p.fr, p.fy); ctx.lineTo(p.fx - p.fr * 2.5, p.fy - p.fr * .9); ctx.lineTo(p.fx - p.fr * 2.5, p.fy + p.fr * .9); ctx.closePath(); ctx.fill()
+        ctx.globalAlpha = 1
+      }
+      // header
+      ctx.fillStyle = 'rgba(3,8,16,0.9)'; ctx.fillRect(0, 0, W, 20)
+      ctx.shadowColor = '#0a7fff'; ctx.shadowBlur = 5; txt(ctx, 'SISTEMA DE ARRASTRE  ·  WARPS  ·  PORTONES  ·  RED', 10, 10, '#0a7fff', 'bold 8px'); ctx.shadowBlur = 0
+      t++; arrastreRafRef.current = requestAnimationFrame(draw)
+    }
+    draw()
+    return () => cancelAnimationFrame(arrastreRafRef.current)
+  }, [vista, seccion])
+
+  // ── Animación radar (puente) ──
+  useEffect(() => {
+    if (vista !== 'radar' || seccion !== 'puente') return
+    const cv = radarRef.current
+    if (!cv) return
+    const ctx = cv.getContext('2d')
+    const W = cv.width, H = cv.height
+    let t = 0
+    function txt(c, s, x, y, col, size, align) { c.fillStyle = col; c.font = size + ' "Courier New"'; c.textAlign = align || 'left'; c.textBaseline = 'middle'; c.fillText(s, x, y) }
+    function draw() {
+      ctx.clearRect(0, 0, W, H); ctx.fillStyle = '#021208'; ctx.fillRect(0, 0, W, H)
+      ctx.strokeStyle = '#061a0c'; ctx.lineWidth = .5
+      for (let x = 0; x < W; x += 20) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke() }
+      for (let y = 0; y < H; y += 20) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke() }
+      ctx.fillStyle = '#031608'; ctx.fillRect(0, 0, W, 24)
+      ctx.shadowColor = '#00ff9d'; ctx.shadowBlur = 6; txt(ctx, '◉ PUENTE  ·  RADAR DE PESCA', 10, 12, '#00ff9d', 'bold 9px'); ctx.shadowBlur = 0
+      // radar
+      const rx = Math.round(W * .27), ry = Math.round(H * .55), rr = Math.round(Math.min(W, H) * .33)
+      ctx.strokeStyle = 'rgba(0,255,157,.06)'; ctx.lineWidth = 18; ctx.beginPath(); ctx.arc(rx, ry, rr + 8, 0, Math.PI * 2); ctx.stroke()
+      for (let r2 = rr; r2 > 0; r2 -= rr / 4) { ctx.strokeStyle = r2 === rr ? '#0a2a14' : '#061508'; ctx.lineWidth = r2 === rr ? 1.5 : .5; ctx.beginPath(); ctx.arc(rx, ry, r2, 0, Math.PI * 2); ctx.stroke() }
+      ctx.strokeStyle = '#071a0c'; ctx.lineWidth = .5
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 6) { ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx + Math.cos(a) * rr, ry + Math.sin(a) * rr); ctx.stroke() }
+      const sw = t * .028; ctx.save(); ctx.beginPath(); ctx.moveTo(rx, ry); ctx.arc(rx, ry, rr, sw - 1.1, sw); ctx.closePath()
+      const sg = ctx.createRadialGradient(rx, ry, 0, rx, ry, rr); sg.addColorStop(0, 'rgba(0,255,157,.3)'); sg.addColorStop(1, 'rgba(0,255,157,0)'); ctx.fillStyle = sg; ctx.fill(); ctx.restore()
+      ctx.shadowColor = '#00ff9d'; ctx.shadowBlur = 16; ctx.strokeStyle = '#00ff9d'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx + Math.cos(sw) * rr, ry + Math.sin(sw) * rr); ctx.stroke(); ctx.shadowBlur = 0
+      ctx.shadowColor = '#00ff9d'; ctx.shadowBlur = 20; ctx.fillStyle = '#00ff9d'; ctx.beginPath(); ctx.arc(rx, ry, 5, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0
+      const blips = [{ dx: 48, dy: 22, sp: .009, ph: 1.2 }, { dx: 35, dy: -30, sp: .007, ph: 3.8 }, { dx: 62, dy: 8, sp: .011, ph: 7 }]
+      blips.forEach(b => {
+        const bx = rx + Math.cos(t * b.sp + b.ph) * b.dx, by = ry + Math.sin(t * b.sp + b.ph) * b.dy
+        const ang = Math.atan2(by - ry, bx - rx), diff = ((sw - ang) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2)
+        if (diff < 1.2) { const fade = 1 - diff / 1.2; ctx.fillStyle = `rgba(232,196,50,${.5 + fade * .5})`; ctx.beginPath(); ctx.arc(bx, by, 2.5, 0, Math.PI * 2); ctx.fill(); ctx.shadowColor = '#e8c432'; ctx.shadowBlur = 8; ctx.strokeStyle = `rgba(232,196,50,${fade * .6})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(bx, by, 7, 0, Math.PI * 2); ctx.stroke(); ctx.shadowBlur = 0 }
+      })
+      txt(ctx, 'RADAR · 3 NM', rx, ry + rr + 12, '#1a5030', '8px', 'center')
+      // panel derecho
+      const px = Math.round(W * .54)
+      ctx.fillStyle = '#031410'; ctx.fillRect(px, 24, W - px, H - 24)
+      ctx.strokeStyle = '#0a2518'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px, 24); ctx.lineTo(px, H); ctx.stroke()
+      ctx.shadowColor = '#00ff9d'; ctx.shadowBlur = 4; txt(ctx, '⚓ ARMAMENTO', px + 10, 36, '#00ff9d', 'bold 10px'); ctx.shadowBlur = 0
+      const items = [
+        { ico: '🕸', lbl: 'RED PRINCIPAL', v: '80mm · 500m', col: '#00ff9d' },
+        { ico: '⚓', lbl: 'PORTONES', v: 'Thyborøn T4', col: '#0a7fff' },
+        { ico: '🔗', lbl: 'WARPS', v: 'Ø28mm · 800m', col: '#e8c432' },
+        { ico: '⚙', lbl: 'WINCHES', v: 'Rapp · 90kW', col: '#c084fc' },
+        { ico: '📏', lbl: 'TANGONES', v: '18m · Fijo', col: '#ff6b1a' },
+      ]
+      items.forEach((it, i) => {
+        const iy = 52 + i * Math.round((H - 62) / items.length)
+        ctx.fillStyle = it.col + '12'; ctx.fillRect(px + 8, iy, W - px - 16, 32); ctx.strokeStyle = it.col + '30'; ctx.lineWidth = 1; ctx.strokeRect(px + 8, iy, W - px - 16, 32)
+        ctx.shadowColor = it.col; ctx.shadowBlur = 3; ctx.fillStyle = it.col; ctx.fillRect(px + 8, iy, 3, 32); ctx.shadowBlur = 0
+        ctx.font = '13px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(it.ico, px + 16, iy + 10)
+        txt(ctx, it.lbl, px + 34, iy + 9, it.col, 'bold 8px'); txt(ctx, it.v, W - 10, iy + 16, '#aaccaa', 'bold 7px', 'right')
+      })
+      t++; radarRafRef.current = requestAnimationFrame(draw)
+    }
+    draw()
+    return () => cancelAnimationFrame(radarRafRef.current)
+  }, [vista, seccion])
+
   function setMotor(motor, campo, valor) {
     setFichaMotor(f => ({ ...f, [motor]: { ...f[motor], [campo]: valor } }))
   }
@@ -538,9 +684,12 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
       {/* Tabs */}
       <div className="flex gap-0 border-b border-navy-700 bg-navy-800 flex-shrink-0 overflow-x-auto scrollbar-none">
         {[
+          ...(seccion === 'maquinas' ? [['hud', 'Blueprint HUD']] : []),
+          ...(seccion === 'cubierta' ? [['arrastre', 'Sistema arrastre']] : []),
+          ...(seccion === 'puente' ? [['radar', 'Radar']] : []),
           ['stock', 'Repuestos'],
           ['pedido', 'Orden compra'],
-          ...(seccion === 'maquinas' ? [['hud', 'Blueprint HUD'], ['ficha', 'Ficha motor']] : []),
+          ...(seccion === 'maquinas' ? [['ficha', 'Ficha motor']] : []),
           ...(seccion === 'cubierta' || seccion === 'puente' ? [['artes', 'Artes de pesca']] : []),
         ].map(([id, label]) => (
           <button key={id} onClick={() => setVista(id)}
@@ -759,6 +908,18 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
         {vista === 'hud' && seccion === 'maquinas' && (
           <div style={{ background: '#02080f' }}>
             <canvas ref={hudRef} width={800} height={340} style={{ width: '100%', height: 'auto', display: 'block' }} />
+          </div>
+        )}
+
+        {vista === 'arrastre' && seccion === 'cubierta' && (
+          <div style={{ background: '#010c1c' }}>
+            <canvas ref={arrastreRef} width={480} height={300} style={{ width: '100%', height: 'auto', display: 'block' }} />
+          </div>
+        )}
+
+        {vista === 'radar' && seccion === 'puente' && (
+          <div style={{ background: '#021208' }}>
+            <canvas ref={radarRef} width={480} height={300} style={{ width: '100%', height: 'auto', display: 'block' }} />
           </div>
         )}
 
