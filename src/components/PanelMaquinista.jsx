@@ -203,6 +203,8 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
   const [confirmarId, setConfirmarId] = useState(null)
   const [subiendo, setSubiendo] = useState(false)
   const fileRef = useRef()
+  const hudRef = useRef()
+  const hudRafRef = useRef()
 
   // Ficha técnica motor (solo maquinas)
   const fichaMotorVacia = {
@@ -261,6 +263,153 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
       setArtesGuardando(false)
     }
   }
+
+  useEffect(() => {
+    if (vista !== 'hud' || seccion !== 'maquinas') return
+    const cv = hudRef.current
+    if (!cv) return
+    const ctx = cv.getContext('2d')
+    const W = cv.width, H = cv.height
+    let t = 0
+
+    function gl(c, col, b) { c.shadowColor = col; c.shadowBlur = b }
+    function ng(c) { c.shadowBlur = 0 }
+    function rect(c, x, y, w, h, fill, stroke, sw) {
+      c.fillStyle = fill; c.fillRect(x, y, w, h)
+      if (stroke) { c.strokeStyle = stroke; c.lineWidth = sw || 1; c.strokeRect(x, y, w, h) }
+    }
+    function txt(c, s, x, y, col, size, align, base) {
+      c.fillStyle = col; c.font = size + ' "Courier New"'
+      c.textAlign = align || 'left'; c.textBaseline = base || 'top'; c.fillText(s, x, y)
+    }
+    function gauge(cx, cy, r, val, max, col, lbl, unit) {
+      const s = Math.PI * .75, e = Math.PI * 2.25, f = s + (e - s) * (val / max)
+      ctx.strokeStyle = '#0a1e30'; ctx.lineWidth = 8
+      ctx.beginPath(); ctx.arc(cx, cy, r, s, e); ctx.stroke()
+      for (let i = 0; i <= 8; i++) {
+        const a = s + (e - s) * i / 8, r1 = i % 2 === 0 ? r - 10 : r - 6
+        ctx.strokeStyle = i % 2 === 0 ? '#1a3a55' : '#0d2035'; ctx.lineWidth = i % 2 === 0 ? 1.5 : 1
+        ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1)
+        ctx.lineTo(cx + Math.cos(a) * (r + 2), cy + Math.sin(a) * (r + 2)); ctx.stroke()
+      }
+      gl(ctx, col, 10); ctx.strokeStyle = col; ctx.lineWidth = 8; ctx.lineCap = 'round'
+      ctx.beginPath(); ctx.arc(cx, cy, r, s, f); ctx.stroke()
+      ctx.lineCap = 'butt'; ng(ctx)
+      gl(ctx, col, 6); txt(ctx, String(val), cx, cy - 6, col, 'bold 13px', 'center', 'middle'); ng(ctx)
+      txt(ctx, unit, cx, cy + 8, '#4a7090', '8px', 'center', 'middle')
+      txt(ctx, lbl, cx, cy + r + 10, '#6a90b0', 'bold 8px', 'center', 'top')
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H)
+      rect(ctx, 0, 0, W, H, '#02080f')
+      // grid
+      ctx.strokeStyle = '#06182a'; ctx.lineWidth = .4
+      for (let x = 0; x < W; x += 20) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke() }
+      for (let y = 0; y < H; y += 20) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke() }
+
+      // header
+      rect(ctx, 0, 0, W, 26, '#04111e')
+      gl(ctx, '#00d4ff', 6); txt(ctx, '◉  SALA DE MÁQUINAS  ·  FICHA TÉCNICA', 12, 7, '#00d4ff', 'bold 9px'); ng(ctx)
+      const hh = Math.floor(t / 3600) % 24, mm = Math.floor(t / 60) % 60
+      txt(ctx, String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'), W - 10, 8, '#2a5a80', '8px', 'right')
+
+      // AUX dimensions
+      const aw = Math.round(W * 0.155), ah = 110, ay = 68
+      const ax1 = Math.round(W * 0.04), ax2 = W - ax1 - aw
+
+      // AUX 1
+      rect(ctx, ax1, ay, aw, ah, '#030e18', '#1a4a6a', 1.5)
+      gl(ctx, '#00ff9d', 4); ctx.fillStyle = '#00ff9d'; ctx.fillRect(ax1, ay, aw, 2); ng(ctx)
+      txt(ctx, 'AUXILIAR 1', ax1 + aw / 2, ay + 5, '#2a7a50', 'bold 7px', 'center')
+      for (let i = 0; i < 3; i++) {
+        const px = ax1 + 10 + i * (Math.round(aw / 3) - 2), ph = Math.sin(t * .06 + i * 2.1) * 12
+        rect(ctx, px, ay + 28, Math.round(aw / 3) - 6, 44, '#0a2030', '#1a4a5a', 1)
+        gl(ctx, '#00ff9d', 6); rect(ctx, px + 2, ay + 30 + ph, Math.round(aw / 3) - 10, 16, '#00ff9d60'); ng(ctx)
+      }
+      txt(ctx, '85 kW · 1800 rpm', ax1 + aw / 2, ay + ah - 16, '#1a5040', '7px', 'center')
+      gl(ctx, '#00ff9d', 10); ctx.fillStyle = '#00ff9d'
+      ctx.beginPath(); ctx.arc(ax1 + aw - 10, ay + 11, 4, 0, Math.PI * 2); ctx.fill(); ng(ctx)
+
+      // AUX 2
+      rect(ctx, ax2, ay, aw, ah, '#030e18', '#1a4a6a', 1.5)
+      gl(ctx, '#00ff9d', 4); ctx.fillStyle = '#00ff9d'; ctx.fillRect(ax2, ay, aw, 2); ng(ctx)
+      txt(ctx, 'AUXILIAR 2', ax2 + aw / 2, ay + 5, '#2a7a50', 'bold 7px', 'center')
+      for (let i = 0; i < 3; i++) {
+        const px = ax2 + 10 + i * (Math.round(aw / 3) - 2), ph = Math.sin(t * .06 + i * 2.1 + Math.PI) * 12
+        rect(ctx, px, ay + 28, Math.round(aw / 3) - 6, 44, '#0a2030', '#1a4a5a', 1)
+        gl(ctx, '#00ff9d', 6); rect(ctx, px + 2, ay + 30 + ph, Math.round(aw / 3) - 10, 16, '#00ff9d60'); ng(ctx)
+      }
+      txt(ctx, '85 kW · 1800 rpm', ax2 + aw / 2, ay + ah - 16, '#1a5040', '7px', 'center')
+      gl(ctx, '#00ff9d', 10); ctx.fillStyle = '#00ff9d'
+      ctx.beginPath(); ctx.arc(ax2 + aw - 10, ay + 11, 4, 0, Math.PI * 2); ctx.fill(); ng(ctx)
+
+      // Motor principal
+      const mx = Math.round(W * .28), mw = Math.round(W * .44), my = 42, mh = 140
+      rect(ctx, mx, my, mw, mh, '#040f1a', '#00d4ff', 2)
+      gl(ctx, '#00d4ff', 4); ctx.fillStyle = '#00d4ff'; ctx.fillRect(mx, my, mw, 3); ng(ctx)
+      txt(ctx, 'MOTOR PRINCIPAL', mx + mw / 2, my + 7, '#00d4ff', 'bold 9px', 'center')
+      txt(ctx, 'MAN B&W  ·  374 kW', mx + mw / 2, my + 18, '#1a5070', '7px', 'center')
+      const ncyl = 6
+      for (let i = 0; i < ncyl; i++) {
+        const cxp = mx + Math.round(mw / (ncyl + 1)) * (i + 1)
+        const cw = Math.round(mw / (ncyl + 1)) - 6
+        const ph = Math.sin(t * .055 + i * 1.047) * 20
+        rect(ctx, cxp - cw / 2, my + 34, cw, 58, '#060f1c', '#0d2a40', 1)
+        gl(ctx, '#00d4ff', 8); rect(ctx, cxp - cw / 2 + 2, my + 37 + ph, cw - 4, 18, '#00d4ff30'); ng(ctx)
+        ctx.strokeStyle = '#00d4ff50'; ctx.lineWidth = 1.5
+        ctx.beginPath(); ctx.moveTo(cxp, my + 37 + ph + 9); ctx.lineTo(cxp, my + 96); ctx.stroke()
+        gl(ctx, '#00d4ff', 10); ctx.fillStyle = '#00d4ff80'
+        ctx.beginPath(); ctx.arc(cxp, my + 100 + Math.sin(t * .055 + i * 1.047) * 5, 3, 0, Math.PI * 2); ctx.fill(); ng(ctx)
+      }
+      // crankshaft
+      ctx.strokeStyle = '#0d3050'; ctx.lineWidth = 3
+      ctx.beginPath(); ctx.moveTo(mx + 10, my + 106); ctx.lineTo(mx + mw - 10, my + 106); ctx.stroke()
+      // shaft lines to aux
+      ctx.strokeStyle = '#0a2535'; ctx.lineWidth = 3
+      ctx.beginPath(); ctx.moveTo(mx, my + mh / 2); ctx.lineTo(ax1 + aw, my + mh / 2); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(mx + mw, my + mh / 2); ctx.lineTo(ax2, my + mh / 2); ctx.stroke()
+      // hélice arrow
+      gl(ctx, '#00d4ff', 8); ctx.fillStyle = '#00d4ff'
+      ctx.beginPath(); ctx.moveTo(ax1 + aw + 14, my + mh / 2 - 7); ctx.lineTo(ax1 + aw + 2, my + mh / 2); ctx.lineTo(ax1 + aw + 14, my + mh / 2 + 7); ctx.closePath(); ctx.fill(); ng(ctx)
+      txt(ctx, 'HÉLICE', ax1 + aw / 2 + 4, my + mh / 2 + 10, '#1a5070', '7px', 'center')
+
+      // Gauges
+      const gy = Math.round(H * .77)
+      const rpm = Math.round(290 + Math.sin(t * .018) * 28)
+      const temp = Math.round(76 + Math.sin(t * .013) * 6)
+      const pres = Math.round((6.2 + Math.sin(t * .022) * .4) * 10) / 10
+      const volt = Math.round(218 + Math.sin(t * .03) * 6)
+      const gr = Math.round(W * .065)
+      gauge(W / 2 - gr * 3, gy, gr, rpm, 400, '#00d4ff', 'RPM', 'rpm')
+      gauge(W / 2 - gr, gy, gr, temp, 120, '#ff6b1a', 'T°AGUA', '°C')
+      gauge(W / 2 + gr, gy, gr, pres, 10, '#c084fc', 'PRESIÓN', 'bar')
+      gauge(W / 2 + gr * 3, gy, gr, volt, 260, '#00ff9d', 'VOLTAJE', 'V')
+
+      // Tanks
+      const tanks = [
+        { lbl: 'COMB. DF', val: '58.800 L', col: '#e8c432', pct: .62 },
+        { lbl: 'AGUA DULCE', val: '22.830 L', col: '#0a7fff', pct: .78 },
+        { lbl: 'ACEITE LUB.', val: '3.000 L', col: '#00ff9d', pct: .90 },
+        { lbl: 'ACEITE HID.', val: '2.400 L', col: '#c084fc', pct: .55 },
+        { lbl: 'LODOS', val: '1.500 L', col: '#ff6b1a', pct: .30 },
+      ]
+      const tw = Math.round((W - 32) / tanks.length - 6), th = 20, ty = H - 28
+      tanks.forEach((tk, i) => {
+        const tx = 16 + i * (tw + 6)
+        rect(ctx, tx, ty, tw, th, '#040e1a', tk.col + '40', 1)
+        gl(ctx, tk.col, 4); ctx.fillStyle = tk.col + '25'; ctx.fillRect(tx + 1, ty + 1, Math.max(0, (tw - 2) * tk.pct), th - 2); ng(ctx)
+        txt(ctx, tk.lbl, tx + 4, ty + 3, tk.col, 'bold 6px')
+        txt(ctx, tk.val, tx + tw - 4, ty + 11, '#ffffff', '6px', 'right')
+      })
+      txt(ctx, 'TANQUES', W / 2, ty - 10, '#1a3a55', 'bold 7px', 'center', 'bottom')
+
+      t++
+      hudRafRef.current = requestAnimationFrame(draw)
+    }
+    draw()
+    return () => cancelAnimationFrame(hudRafRef.current)
+  }, [vista, seccion])
 
   function setMotor(motor, campo, valor) {
     setFichaMotor(f => ({ ...f, [motor]: { ...f[motor], [campo]: valor } }))
@@ -391,7 +540,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
         {[
           ['stock', 'Repuestos'],
           ['pedido', 'Orden compra'],
-          ...(seccion === 'maquinas' ? [['ficha', 'Ficha motor']] : []),
+          ...(seccion === 'maquinas' ? [['hud', 'Blueprint HUD'], ['ficha', 'Ficha motor']] : []),
           ...(seccion === 'cubierta' || seccion === 'puente' ? [['artes', 'Artes de pesca']] : []),
         ].map(([id, label]) => (
           <button key={id} onClick={() => setVista(id)}
@@ -603,6 +752,13 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ===== VISTA HUD ANIMADO (solo maquinas) ===== */}
+        {vista === 'hud' && seccion === 'maquinas' && (
+          <div style={{ background: '#02080f' }}>
+            <canvas ref={hudRef} width={800} height={340} style={{ width: '100%', height: 'auto', display: 'block' }} />
           </div>
         )}
 

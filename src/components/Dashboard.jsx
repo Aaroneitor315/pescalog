@@ -167,7 +167,7 @@ const SECTORES_INFO = [
   },
 ]
 
-function SectoresHero({ perfil, onAbrirSector }) {
+function SectoresHero({ perfil, onAbrirSector, esAdmin }) {
   const sorted = [...SECTORES_INFO].sort((a, b) => {
     if (perfil?.sector === a.id) return -1
     if (perfil?.sector === b.id) return 1
@@ -180,7 +180,7 @@ function SectoresHero({ perfil, onAbrirSector }) {
         {sorted.map(s => {
           const { Icon } = s
           const esMio = perfil?.sector === s.id
-          const bloqueado = perfil?.sector && !esMio
+          const bloqueado = !esAdmin && perfil?.sector && !esMio
           return (
             <button
               key={s.id}
@@ -217,7 +217,7 @@ function SectoresHero({ perfil, onAbrirSector }) {
   )
 }
 
-export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirSector, onNuevoViaje, perfil }) {
+export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirSector, onNuevoViaje, perfil, esAdmin }) {
   const especies = useMemo(() => {
     const set = new Set(viajes.map(v => v.especie))
     return ['todas', ...Array.from(set).sort()]
@@ -278,7 +278,7 @@ export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirS
   if (!viajes.length) {
     return (
       <div className="space-y-6">
-        <SectoresHero perfil={perfil} onAbrirSector={onAbrirSector} />
+        <SectoresHero perfil={perfil} onAbrirSector={onAbrirSector} esAdmin={esAdmin} />
         <DolarCards />
         <div className="card text-center py-12 px-6 flex flex-col items-center gap-4">
           <div style={{width:80,height:80,borderRadius:'50%',background:'rgba(6,182,212,0.1)',border:'2px solid rgba(6,182,212,0.2)',display:'flex',alignItems:'center',justifyContent:'center'}}>
