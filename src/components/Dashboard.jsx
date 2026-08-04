@@ -167,7 +167,7 @@ const SECTORES_INFO = [
   },
 ]
 
-function SectoresHero({ perfil, onAbrirSector, esAdmin }) {
+function SectoresHero({ perfil, onAbrirSector }) {
   const sorted = [...SECTORES_INFO].sort((a, b) => {
     if (perfil?.sector === a.id) return -1
     if (perfil?.sector === b.id) return 1
@@ -180,33 +180,28 @@ function SectoresHero({ perfil, onAbrirSector, esAdmin }) {
         {sorted.map(s => {
           const { Icon } = s
           const esMio = perfil?.sector === s.id
-          const bloqueado = !esAdmin && perfil?.sector && !esMio
           return (
             <button
               key={s.id}
-              onClick={() => !bloqueado && onAbrirSector(s.id)}
+              onClick={() => onAbrirSector(s.id)}
               className="flex flex-col items-center text-center rounded-2xl py-4 px-2 transition-all active:scale-95"
               style={{
-                background: bloqueado ? '#0a1628' : esMio ? s.color + '14' : s.color + '0d',
-                border: `1.5px solid ${bloqueado ? '#112240' : esMio ? s.color + '60' : s.color + '30'}`,
-                opacity: bloqueado ? 0.4 : 1,
-                cursor: bloqueado ? 'not-allowed' : 'pointer',
+                background: esMio ? s.color + '14' : s.color + '0d',
+                border: `1.5px solid ${esMio ? s.color + '60' : s.color + '30'}`,
+                cursor: 'pointer',
                 boxShadow: esMio ? `0 0 18px ${s.color}18` : 'none',
               }}
             >
               <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-2.5"
-                style={{ background: bloqueado ? '#0d1829' : s.color + '1a', border: `1.5px solid ${bloqueado ? '#1a2f45' : s.color + '40'}` }}>
-                {bloqueado
-                  ? <Lock size={20} className="text-slate-700" />
-                  : <Icon size={24} className={s.textColor} />
-                }
+                style={{ background: s.color + '1a', border: `1.5px solid ${s.color + '40'}` }}>
+                <Icon size={24} className={s.textColor} />
               </div>
-              <p className="text-xs font-bold leading-tight" style={{ color: bloqueado ? '#1e3a5f' : s.color }}>{s.label}</p>
+              <p className="text-xs font-bold leading-tight" style={{ color: s.color }}>{s.label}</p>
               {esMio && (
                 <span className="mt-1 text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
                   style={{ background: s.color + '20', color: s.color }}>Tu sector</span>
               )}
-              {!bloqueado && !esMio && (
+              {!esMio && (
                 <p className="text-[9px] mt-0.5" style={{ color: '#2a4a6a' }}>{s.sub.split('·')[0].trim()}</p>
               )}
             </button>
