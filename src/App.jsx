@@ -17,7 +17,6 @@ import { usePrecios } from './hooks/usePrecios'
 import { useLibreta } from './hooks/useLibreta'
 import { useAuth } from './hooks/useAuth'
 import { usePerfil } from './hooks/usePerfil'
-import { esAdmin } from './hooks/useAdmin'
 
 export default function App() {
   const { user, loading, cerrarSesion } = useAuth()
@@ -96,7 +95,7 @@ export default function App() {
             onAbrirSector={setSectorAbierto}
             onNuevoViaje={() => setTab('nuevo')}
             perfil={perfil}
-          esAdmin={esAdmin(user)}
+          esAdmin={user?.email === 'alangambacorta7@gmail.com'}
           />
         )}
         {tab === 'historial' && (
