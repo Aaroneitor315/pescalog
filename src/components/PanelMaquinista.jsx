@@ -40,7 +40,8 @@ const SECTORES = {
   },
 }
 
-const CATEGORIAS = ['Filtro aceite', 'Filtro combustible', 'Filtro aire', 'Filtro hidráulico', 'Correa', 'Rodamiento', 'Junta', 'Otro']
+const CATEGORIAS_MAQUINAS = ['Filtro aceite', 'Filtro combustible', 'Filtro aire', 'Filtro hidráulico', 'Correa', 'Rodamiento', 'Junta', 'Otro']
+const CATEGORIAS_CUBIERTA = ['Cable acero', 'Malleta', 'Grillete', 'Brida', 'Cable combinado', 'Cabo culo bolsa', 'Francés', 'Euroline', 'Otro']
 
 function preprocesarImagen(file, escala = 2) {
   return new Promise(resolve => {
@@ -198,7 +199,9 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
   const vistaInicial = seccion === 'maquinas' ? 'hud' : seccion === 'cubierta' ? 'arrastre' : seccion === 'puente' ? 'radar' : 'stock'
   const [vista, setVista] = useState(vistaInicial)
   const [ocr, setOcr] = useState({ activo: false, progreso: false, texto: '', codigo: '' })
-  const [form, setForm] = useState({ codigo: '', descripcion: '', marca: '', categoria: 'Filtro aceite', stockActual: 1, stockMinimo: 1, cantPedir: 1, foto: null, fotoBlob: null, fotoPreview: null })
+  const CATEGORIAS = seccion === 'maquinas' ? CATEGORIAS_MAQUINAS : CATEGORIAS_CUBIERTA
+  const catDefault = CATEGORIAS[0]
+  const [form, setForm] = useState({ codigo: '', descripcion: '', marca: '', categoria: catDefault, stockActual: 1, stockMinimo: 1, cantPedir: 1, foto: null, fotoBlob: null, fotoPreview: null })
   const [modoAgregar, setModoAgregar] = useState(false)
   const [editandoId, setEditandoId] = useState(null)
   const [confirmarId, setConfirmarId] = useState(null)
@@ -578,7 +581,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
       codigo: r.codigo || '',
       descripcion: r.descripcion || '',
       marca: r.marca || '',
-      categoria: r.categoria || 'Filtro aceite',
+      categoria: r.categoria || catDefault,
       stockActual: r.stockActual ?? 1,
       stockMinimo: r.stockMinimo ?? 1,
       cantPedir: r.cantPedir ?? 1,
@@ -587,7 +590,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     setModoAgregar(true)
   }
 
-  const resetForm = () => setForm({ codigo: '', descripcion: '', marca: '', categoria: 'Filtro aceite', stockActual: 1, stockMinimo: 1, cantPedir: 1, foto: null, fotoBlob: null, fotoPreview: null })
+  const resetForm = () => setForm({ codigo: '', descripcion: '', marca: '', categoria: catDefault, stockActual: 1, stockMinimo: 1, cantPedir: 1, foto: null, fotoBlob: null, fotoPreview: null })
 
   async function guardarEdicion() {
     if (!form.codigo.trim()) return
