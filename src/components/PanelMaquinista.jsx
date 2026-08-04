@@ -422,7 +422,10 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     const cv = arrastreRef.current
     if (!cv) return
     const ctx = cv.getContext('2d')
-    const W = cv.width, H = cv.height, WY = Math.round(H * .5)
+    const dpr = window.devicePixelRatio || 1
+    const W = 480, H = 300, WY = 150
+    cv.width = W * dpr; cv.height = H * dpr
+    ctx.scale(dpr, dpr)
     let t = 0
     const peces = []
     for (let pi = 0; pi < 14; pi++) {
@@ -433,6 +436,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
       ctx.clearRect(0, 0, W, H)
       // cielo
       const skyG = ctx.createLinearGradient(0, 0, 0, WY); skyG.addColorStop(0, '#010509'); skyG.addColorStop(1, '#020c1a'); ctx.fillStyle = skyG; ctx.fillRect(0, 0, W, WY)
+
       // estrellas
       const st = [[32,12],[90,8],[160,18],[240,11],[310,16],[60,35],[180,30],[280,22],[400,14]]
       for (let si = 0; si < st.length; si++) { ctx.globalAlpha = .3 + Math.sin(t * .03 + si * 1.2) * .2; ctx.fillStyle = '#c8e0ff'; ctx.fillRect(st[si][0], st[si][1], 1, 1) }
@@ -505,7 +509,10 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     const cv = radarRef.current
     if (!cv) return
     const ctx = cv.getContext('2d')
-    const W = cv.width, H = cv.height
+    const dpr = window.devicePixelRatio || 1
+    const W = 480, H = 300
+    cv.width = W * dpr; cv.height = H * dpr
+    ctx.scale(dpr, dpr)
     let t = 0
     function txt(c, s, x, y, col, size, align) { c.fillStyle = col; c.font = size + ' "Courier New"'; c.textAlign = align || 'left'; c.textBaseline = 'middle'; c.fillText(s, x, y) }
     function draw() {
@@ -906,20 +913,20 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
 
         {/* ===== VISTA HUD ANIMADO (solo maquinas) ===== */}
         {vista === 'hud' && seccion === 'maquinas' && (
-          <div style={{ background: '#02080f' }}>
-            <canvas ref={hudRef} width={800} height={340} style={{ width: '100%', height: 'auto', display: 'block' }} />
+          <div style={{ background: '#02080f', display: 'flex', justifyContent: 'center' }}>
+            <canvas ref={hudRef} width={800} height={340} style={{ width: '100%', maxWidth: 700, height: 'auto', display: 'block' }} />
           </div>
         )}
 
         {vista === 'arrastre' && seccion === 'cubierta' && (
-          <div style={{ background: '#010c1c' }}>
-            <canvas ref={arrastreRef} width={480} height={300} style={{ width: '100%', height: 'auto', display: 'block' }} />
+          <div style={{ background: '#010c1c', display: 'flex', justifyContent: 'center' }}>
+            <canvas ref={arrastreRef} style={{ width: '100%', maxWidth: 600, height: 'auto', display: 'block' }} />
           </div>
         )}
 
         {vista === 'radar' && seccion === 'puente' && (
-          <div style={{ background: '#021208' }}>
-            <canvas ref={radarRef} width={480} height={300} style={{ width: '100%', height: 'auto', display: 'block' }} />
+          <div style={{ background: '#021208', display: 'flex', justifyContent: 'center' }}>
+            <canvas ref={radarRef} style={{ width: '100%', maxWidth: 600, height: 'auto', display: 'block' }} />
           </div>
         )}
 
