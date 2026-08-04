@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react'
-import { X, Camera, Plus, Minus, Trash2, FileText, Wrench, Anchor, Loader, Pencil } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { X, Camera, Plus, Minus, Trash2, FileText, Wrench, Anchor, Loader, Pencil, Save, ChevronDown, ChevronUp } from 'lucide-react'
 import { createWorker } from 'tesseract.js'
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
-import { storage } from '../firebase'
+import { getDoc, setDoc, doc } from 'firebase/firestore'
+import { storage, db } from '../firebase'
 import { useRepuestos } from '../hooks/useRepuestos'
 
 const SECTORES = {
@@ -41,30 +42,28 @@ const SECTORES = {
 
 const CATEGORIAS = ['Filtro aceite', 'Filtro combustible', 'Filtro aire', 'Filtro hidráulico', 'Correa', 'Rodamiento', 'Junta', 'Otro']
 
-function preprocesarImagen(file) {
+function preprocesarImagen(file, escala = 2) {
   return new Promise(resolve => {
     const img = new Image()
     img.onload = () => {
       const canvas = document.createElement('canvas')
-      // Mantener resolución original para OCR
-      canvas.width = img.width
-      canvas.height = img.height
+      // Escalar imagen para dar más píxeles por carácter al OCR
+      canvas.width = img.width * escala
+      canvas.height = img.height * escala
       const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0)
-      // Escala de grises + alto contraste
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
       const d = imageData.data
       for (let i = 0; i < d.length; i += 4) {
-        // Luminancia perceptual
         const lum = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2]
-        // Contraste: curva S agresiva (empuja claro→blanco, oscuro→negro)
-        const c = lum < 128
-          ? Math.max(0, lum * 0.6)
-          : Math.min(255, 128 + (lum - 128) * 1.6)
+        // Umbral adaptativo: texto oscuro→negro, fondo claro→blanco
+        const c = lum < 140
+          ? Math.max(0, lum * 0.5)
+          : Math.min(255, 128 + (lum - 128) * 1.8)
         d[i] = d[i+1] = d[i+2] = c
       }
       ctx.putImageData(imageData, 0, 0)
-      canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.95)
+      canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.92)
     }
     img.src = URL.createObjectURL(file)
   })
@@ -101,25 +100,48 @@ async function eliminarFotoStorage(url) {
   } catch {}
 }
 
-function extraerCodigo(texto) {
-  // Corregir confusiones comunes de OCR en códigos industriales
-  const normalizado = texto
-    .replace(/\bO\b/g, '0')
-    .replace(/[|l]/g, '1')
-    .replace(/\bS\b/g, '5')
-    .replace(/\bB\b/g, '8')
+function normalizarOCR(texto) {
+  return texto
+    .replace(/0/g, '0')       // mantener ceros
+    .replace(/\bO(?=\d)/g, '0')  // O seguida de dígito → 0
+    .replace(/(?<=\d)O\b/g, '0') // O precedida de dígito → 0
+    .replace(/[|l1]/g, v => v === '|' || v === 'l' ? '1' : v)
+    .replace(/(?<=[A-Z\d])[Il](?=[A-Z\d])/g, '1')
+    // En contexto de código: R al inicio seguida de dígitos probablemente es P
+    .replace(/^R(?=\d{4,})/gm, 'P')
+    .replace(/\bR(?=\d{5,})/g, 'P')
+}
 
-  const patrones = [
-    /[A-Z]{1,4}[-.\s]?\d{3,8}[-.\s]?[A-Z0-9]{0,4}/i,
-    /\d{4,10}[A-Z]{0,3}/i,
-    /[A-Z]{2,5}\d{2,6}/i,
+function extraerCodigo(texto) {
+  const norm = normalizarOCR(texto.toUpperCase())
+
+  // Patrones por marca (alta prioridad, más específicos)
+  const patronesMarca = [
+    /\bP\d{6}\b/,                         // Donaldson: P551000
+    /\b(LF|AF|FF|FS|WF|SY|HF)\d{4,5}\b/, // Fleetguard
+    /\b(BT|PT|B)\d{4,5}[A-Z]?\b/,        // Baldwin
+    /\b(W|H|C|HU)\d{3,6}[A-Z]?\b/,       // Mann
+    /\b(WIX|51|57)\d{4}\b/,              // Wix
+    /\b(RE|AM|AR|JD)\d{5,7}\b/,          // John Deere
   ]
 
-  for (const patron of patrones) {
-    const match = normalizado.match(patron)
+  for (const patron of patronesMarca) {
+    const match = norm.match(patron)
+    if (match) return match[0].replace(/[\s.-]/g, '')
+  }
+
+  // Patrones genéricos como fallback
+  const patronesGenericos = [
+    /[A-Z]{1,4}[-.]?\d{4,8}[A-Z0-9]{0,3}/,
+    /\d{5,10}[A-Z]{0,2}/,
+    /[A-Z]{2,4}\d{3,6}/,
+  ]
+
+  for (const patron of patronesGenericos) {
+    const match = norm.match(patron)
     if (match) {
-      const codigo = match[0].replace(/[\s.]/g, '').toUpperCase()
-      if (codigo.length >= 4) return codigo
+      const codigo = match[0].replace(/[\s.]/g, '')
+      if (codigo.length >= 5) return codigo
     }
   }
   return ''
@@ -182,6 +204,72 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
   const [subiendo, setSubiendo] = useState(false)
   const fileRef = useRef()
 
+  // Ficha técnica motor (solo maquinas)
+  const fichaMotorVacia = {
+    motorPrincipal: { marca: '', modelo: '', potenciaHP: '', potenciaKW: '', cilindrada: '', rpmMax: '', nroSerie: '', año: '' },
+    auxiliar1: { marca: '', modelo: '', potenciaHP: '', potenciaKW: '' },
+    auxiliar2: { marca: '', modelo: '', potenciaHP: '', potenciaKW: '' },
+  }
+  const [fichaMotor, setFichaMotor] = useState(fichaMotorVacia)
+  const [fichaMotorGuardando, setFichaMotorGuardando] = useState(false)
+  const [fichaMotorGuardado, setFichaMotorGuardado] = useState(false)
+
+  // Artes de pesca (compartido cubierta + puente, mismo doc en Firestore)
+  const artesVacio = {
+    warps: { longitud: '', diametro: '', material: '' },
+    portones: { peso: '', envergadura: '', tipo: '', angulo: '' },
+    malletas: { longitud: '', diametro: '' },
+    red: { aberturaH: '', aberturaV: '', mallasCuerpo: '', mallasSaco: '' },
+  }
+  const [artes, setArtes] = useState(artesVacio)
+  const [artesGuardando, setArtesGuardando] = useState(false)
+  const [artesGuardado, setArtesGuardado] = useState(false)
+  const [artesExpandido, setArtesExpandido] = useState({ warps: true, portones: false, malletas: false, red: false })
+
+  useEffect(() => {
+    if (!uid) return
+    if (seccion === 'maquinas') {
+      getDoc(doc(db, 'usuarios', uid, 'fichas', 'maquinas')).then(snap => {
+        if (snap.exists()) setFichaMotor({ ...fichaMotorVacia, ...snap.data() })
+      }).catch(() => {})
+    }
+    if (seccion === 'cubierta' || seccion === 'puente') {
+      getDoc(doc(db, 'usuarios', uid, 'fichas', 'artes_pesca')).then(snap => {
+        if (snap.exists()) setArtes({ ...artesVacio, ...snap.data() })
+      }).catch(() => {})
+    }
+  }, [uid, seccion])
+
+  async function guardarFichaMotor() {
+    setFichaMotorGuardando(true)
+    try {
+      await setDoc(doc(db, 'usuarios', uid, 'fichas', 'maquinas'), fichaMotor, { merge: true })
+      setFichaMotorGuardado(true)
+      setTimeout(() => setFichaMotorGuardado(false), 2000)
+    } finally {
+      setFichaMotorGuardando(false)
+    }
+  }
+
+  async function guardarArtes() {
+    setArtesGuardando(true)
+    try {
+      await setDoc(doc(db, 'usuarios', uid, 'fichas', 'artes_pesca'), artes, { merge: true })
+      setArtesGuardado(true)
+      setTimeout(() => setArtesGuardado(false), 2000)
+    } finally {
+      setArtesGuardando(false)
+    }
+  }
+
+  function setMotor(motor, campo, valor) {
+    setFichaMotor(f => ({ ...f, [motor]: { ...f[motor], [campo]: valor } }))
+  }
+
+  function setArte(arte, campo, valor) {
+    setArtes(a => ({ ...a, [arte]: { ...a[arte], [campo]: valor } }))
+  }
+
   function abrirEdicion(r) {
     setEditandoId(r.id)
     setForm({
@@ -233,13 +321,21 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     const preview = URL.createObjectURL(blob)
     setForm(f => ({ ...f, fotoBlob: blob, fotoPreview: preview, foto: preview }))
     try {
-      const imagenProcesada = await preprocesarImagen(file)
+      const imagenProcesada = await preprocesarImagen(file, 2)
       const worker = await createWorker('eng')
+      // Pasada 1: PSM 7 = línea de texto única (mejor para etiquetas con código solo)
+      await worker.setParameters({ tessedit_pageseg_mode: '7' })
+      const { data: { text: text7 } } = await worker.recognize(imagenProcesada)
+      // Pasada 2: PSM 11 = texto disperso (mejor para etiquetas con múltiples textos)
       await worker.setParameters({ tessedit_pageseg_mode: '11' })
-      const { data: { text } } = await worker.recognize(imagenProcesada)
+      const { data: { text: text11 } } = await worker.recognize(imagenProcesada)
       await worker.terminate()
-      const codigo = extraerCodigo(text)
-      setOcr({ activo: true, progreso: false, texto: text.trim(), codigo })
+      const codigo7 = extraerCodigo(text7)
+      const codigo11 = extraerCodigo(text11)
+      // Preferir el que matchea un patrón de marca conocida (más específico)
+      const codigo = codigo7.length >= codigo11.length ? codigo7 : codigo11
+      const texto = (text7 + '\n' + text11).trim()
+      setOcr({ activo: true, progreso: false, texto, codigo })
       setForm(f => ({ ...f, codigo: codigo || f.codigo }))
     } catch {
       setOcr({ activo: true, progreso: false, texto: '', codigo: '' })
@@ -281,7 +377,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
             <Icon size={18} className={sector.colorClass} />
           </div>
           <div>
-            <p className="text-sm font-semibold text-white">{sector.label} · Repuestos</p>
+            <p className="text-sm font-semibold text-white">{sector.label}</p>
             <p className="text-xs text-slate-500">{repuestos.length} repuesto{repuestos.length !== 1 ? 's' : ''} · {pendientes.length} alerta{pendientes.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
@@ -291,10 +387,16 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-0 border-b border-navy-700 bg-navy-800 flex-shrink-0">
-        {[['stock', 'Stock actual'], ['pedido', 'Orden de compra']].map(([id, label]) => (
+      <div className="flex gap-0 border-b border-navy-700 bg-navy-800 flex-shrink-0 overflow-x-auto scrollbar-none">
+        {[
+          ['stock', 'Repuestos'],
+          ['pedido', 'Orden compra'],
+          ...(seccion === 'maquinas' ? [['ficha', 'Ficha motor']] : []),
+          ...(seccion === 'cubierta' || seccion === 'puente' ? [['artes', 'Artes de pesca']] : []),
+        ].map(([id, label]) => (
           <button key={id} onClick={() => setVista(id)}
-            className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${vista === id ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-500 hover:text-slate-300'}`}>
+            className={`flex-shrink-0 flex-1 py-2.5 text-xs font-semibold transition-colors border-b-2 ${vista === id ? sector.colorClass : 'text-slate-500 hover:text-slate-300 border-transparent'}`}
+            style={vista === id ? { borderBottomColor: sector.color } : {}}>
             {label}
             {id === 'pedido' && pendientes.length > 0 && (
               <span className="ml-1.5 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{pendientes.length}</span>
@@ -337,8 +439,11 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
                     {ocr.progreso
                       ? <div className="flex items-center gap-2 text-xs text-slate-400"><Loader size={13} className="animate-spin" /> Leyendo código...</div>
                       : ocr.codigo
-                        ? <><p className="text-[10px] text-slate-500">Código detectado</p><p className="text-sm font-bold text-cyan-400">{ocr.codigo}</p><p className="text-[10px] text-green-500">OCR automático</p></>
-                        : <p className="text-xs text-slate-500">Sacá una foto para detectar el código</p>
+                        ? <><p className="text-[10px] text-slate-500">Código detectado</p><p className="text-sm font-bold text-cyan-400">{ocr.codigo}</p><p className="text-[10px] text-green-500">OCR automático · verificá antes de guardar</p></>
+                        : <>
+                            <p className="text-xs text-slate-400 font-medium">Foto del código</p>
+                            <p className="text-[10px] text-slate-500 leading-tight mt-0.5">· De frente, a 15–20 cm<br/>· Buena luz, sin reflejo<br/>· Enfocá solo el número</p>
+                          </>
                     }
                   </div>
                 </div>
@@ -498,6 +603,158 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ===== VISTA FICHA MOTOR (solo maquinas) ===== */}
+        {vista === 'ficha' && seccion === 'maquinas' && (
+          <div className="p-4 space-y-4">
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest">Datos técnicos del motor · se guardan por barco</p>
+
+            {[
+              { key: 'motorPrincipal', title: 'Motor principal', fields: [
+                { k: 'marca', label: 'Marca', placeholder: 'Caterpillar, MAN, Volvo...' },
+                { k: 'modelo', label: 'Modelo', placeholder: '3412, D2868, D13...' },
+                { k: 'potenciaHP', label: 'Potencia (HP)', placeholder: '820', type: 'number' },
+                { k: 'potenciaKW', label: 'Potencia (kW)', placeholder: '612', type: 'number' },
+                { k: 'cilindrada', label: 'Cilindrada (L)', placeholder: '27.0', type: 'number' },
+                { k: 'rpmMax', label: 'RPM máximas', placeholder: '2100', type: 'number' },
+                { k: 'nroSerie', label: 'Nº de serie', placeholder: 'CAT-XXXXXX' },
+                { k: 'año', label: 'Año', placeholder: '2012', type: 'number' },
+              ]},
+              { key: 'auxiliar1', title: 'Auxiliar 1', fields: [
+                { k: 'marca', label: 'Marca', placeholder: 'Volvo, Perkins...' },
+                { k: 'modelo', label: 'Modelo', placeholder: '' },
+                { k: 'potenciaHP', label: 'Potencia (HP)', placeholder: '', type: 'number' },
+                { k: 'potenciaKW', label: 'Potencia (kW)', placeholder: '', type: 'number' },
+              ]},
+              { key: 'auxiliar2', title: 'Auxiliar 2', fields: [
+                { k: 'marca', label: 'Marca', placeholder: '' },
+                { k: 'modelo', label: 'Modelo', placeholder: '' },
+                { k: 'potenciaHP', label: 'Potencia (HP)', placeholder: '', type: 'number' },
+                { k: 'potenciaKW', label: 'Potencia (kW)', placeholder: '', type: 'number' },
+              ]},
+            ].map(({ key, title, fields }) => (
+              <div key={key} className="bg-navy-800 border border-navy-700 rounded-xl p-4 space-y-3">
+                <p className="text-xs font-bold text-cyan-400 uppercase tracking-wider">{title}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {fields.map(f => (
+                    <div key={f.k}>
+                      <label className="text-[10px] text-slate-500 mb-0.5 block">{f.label}</label>
+                      <input
+                        type={f.type || 'text'}
+                        placeholder={f.placeholder}
+                        value={fichaMotor[key]?.[f.k] || ''}
+                        onChange={e => setMotor(key, f.k, e.target.value)}
+                        className="text-sm w-full"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            <button
+              onClick={guardarFichaMotor}
+              disabled={fichaMotorGuardando}
+              className="w-full btn-primary py-3 flex items-center justify-center gap-2 text-sm"
+              style={{ background: fichaMotorGuardado ? '#059669' : undefined }}>
+              {fichaMotorGuardando
+                ? <><Loader size={15} className="animate-spin" /> Guardando...</>
+                : fichaMotorGuardado
+                  ? '✓ Guardado'
+                  : <><Save size={15} /> Guardar ficha técnica</>
+              }
+            </button>
+          </div>
+        )}
+
+        {/* ===== VISTA ARTES DE PESCA (cubierta + puente, datos compartidos) ===== */}
+        {vista === 'artes' && (seccion === 'cubierta' || seccion === 'puente') && (
+          <div className="p-4 space-y-3">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-[10px] text-slate-500 uppercase tracking-widest flex-1">Medidas del arte de pesca · compartido cubierta y puente</p>
+              <span className="text-[9px] px-2 py-0.5 rounded" style={{ background: '#6d28d920', color: '#c084fc', border: '1px solid #6d28d940' }}>Datos compartidos</span>
+            </div>
+
+            {[
+              {
+                key: 'warps', title: 'Warps · Cables de arrastre', color: '#f59e0b',
+                fields: [
+                  { k: 'longitud', label: 'Longitud (m)', placeholder: '600', type: 'number' },
+                  { k: 'diametro', label: 'Diámetro (mm)', placeholder: '24', type: 'number' },
+                  { k: 'material', label: 'Material', placeholder: 'Acero 6×36 IWRC' },
+                ],
+              },
+              {
+                key: 'portones', title: 'Portones · Otter boards', color: '#06b6d4',
+                fields: [
+                  { k: 'peso', label: 'Peso (kg)', placeholder: '800', type: 'number' },
+                  { k: 'envergadura', label: 'Envergadura (m²)', placeholder: '4.5', type: 'number' },
+                  { k: 'tipo', label: 'Tipo', placeholder: 'Polyvalent, Baca, Oval...' },
+                  { k: 'angulo', label: 'Ángulo ataque (°)', placeholder: '45', type: 'number' },
+                ],
+              },
+              {
+                key: 'malletas', title: 'Malletas · Bridas', color: '#10b981',
+                fields: [
+                  { k: 'longitud', label: 'Longitud (m)', placeholder: '120', type: 'number' },
+                  { k: 'diametro', label: 'Diámetro (mm)', placeholder: '18', type: 'number' },
+                ],
+              },
+              {
+                key: 'red', title: 'Red · Aparejo', color: '#a855f7',
+                fields: [
+                  { k: 'aberturaH', label: 'Abertura horiz. (m)', placeholder: '28', type: 'number' },
+                  { k: 'aberturaV', label: 'Abertura vert. (m)', placeholder: '4', type: 'number' },
+                  { k: 'mallasCuerpo', label: 'Malla cuerpo (mm)', placeholder: '110', type: 'number' },
+                  { k: 'mallasSaco', label: 'Malla saco (mm)', placeholder: '60', type: 'number' },
+                ],
+              },
+            ].map(({ key, title, color, fields }) => {
+              const abierto = artesExpandido[key]
+              return (
+                <div key={key} className="bg-navy-800 border border-navy-700 rounded-xl overflow-hidden">
+                  <button
+                    className="w-full flex items-center justify-between px-4 py-3"
+                    onClick={() => setArtesExpandido(e => ({ ...e, [key]: !e[key] }))}>
+                    <p className="text-xs font-bold uppercase tracking-wider" style={{ color }}>{title}</p>
+                    {abierto ? <ChevronUp size={15} className="text-slate-500" /> : <ChevronDown size={15} className="text-slate-500" />}
+                  </button>
+                  {abierto && (
+                    <div className="px-4 pb-4">
+                      <div className="grid grid-cols-2 gap-2">
+                        {fields.map(f => (
+                          <div key={f.k}>
+                            <label className="text-[10px] text-slate-500 mb-0.5 block">{f.label}</label>
+                            <input
+                              type={f.type || 'text'}
+                              placeholder={f.placeholder}
+                              value={artes[key]?.[f.k] || ''}
+                              onChange={e => setArte(key, f.k, e.target.value)}
+                              className="text-sm w-full"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
+            <button
+              onClick={guardarArtes}
+              disabled={artesGuardando}
+              className="w-full btn-primary py-3 flex items-center justify-center gap-2 text-sm"
+              style={{ background: artesGuardado ? '#059669' : undefined }}>
+              {artesGuardando
+                ? <><Loader size={15} className="animate-spin" /> Guardando...</>
+                : artesGuardado
+                  ? '✓ Guardado'
+                  : <><Save size={15} /> Guardar artes de pesca</>
+              }
+            </button>
           </div>
         )}
 

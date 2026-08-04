@@ -167,6 +167,56 @@ const SECTORES_INFO = [
   },
 ]
 
+function SectoresHero({ perfil, onAbrirSector }) {
+  const sorted = [...SECTORES_INFO].sort((a, b) => {
+    if (perfil?.sector === a.id) return -1
+    if (perfil?.sector === b.id) return 1
+    return 0
+  })
+  return (
+    <div>
+      <p className="text-[10px] text-slate-600 uppercase tracking-widest font-semibold mb-2.5 px-0.5">Sectores a bordo</p>
+      <div className="grid grid-cols-3 gap-2.5">
+        {sorted.map(s => {
+          const { Icon } = s
+          const esMio = perfil?.sector === s.id
+          const bloqueado = perfil?.sector && !esMio
+          return (
+            <button
+              key={s.id}
+              onClick={() => !bloqueado && onAbrirSector(s.id)}
+              className="flex flex-col items-center text-center rounded-2xl py-4 px-2 transition-all active:scale-95"
+              style={{
+                background: bloqueado ? '#0a1628' : esMio ? s.color + '14' : s.color + '0d',
+                border: `1.5px solid ${bloqueado ? '#112240' : esMio ? s.color + '60' : s.color + '30'}`,
+                opacity: bloqueado ? 0.4 : 1,
+                cursor: bloqueado ? 'not-allowed' : 'pointer',
+                boxShadow: esMio ? `0 0 18px ${s.color}18` : 'none',
+              }}
+            >
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-2.5"
+                style={{ background: bloqueado ? '#0d1829' : s.color + '1a', border: `1.5px solid ${bloqueado ? '#1a2f45' : s.color + '40'}` }}>
+                {bloqueado
+                  ? <Lock size={20} className="text-slate-700" />
+                  : <Icon size={24} className={s.textColor} />
+                }
+              </div>
+              <p className="text-xs font-bold leading-tight" style={{ color: bloqueado ? '#1e3a5f' : s.color }}>{s.label}</p>
+              {esMio && (
+                <span className="mt-1 text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                  style={{ background: s.color + '20', color: s.color }}>Tu sector</span>
+              )}
+              {!bloqueado && !esMio && (
+                <p className="text-[9px] mt-0.5" style={{ color: '#2a4a6a' }}>{s.sub.split('·')[0].trim()}</p>
+              )}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirSector, onNuevoViaje, perfil }) {
   const especies = useMemo(() => {
     const set = new Set(viajes.map(v => v.especie))
@@ -228,6 +278,7 @@ export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirS
   if (!viajes.length) {
     return (
       <div className="space-y-6">
+        <SectoresHero perfil={perfil} onAbrirSector={onAbrirSector} />
         <DolarCards />
         <div className="card text-center py-12 px-6 flex flex-col items-center gap-4">
           <div style={{width:80,height:80,borderRadius:'50%',background:'rgba(6,182,212,0.1)',border:'2px solid rgba(6,182,212,0.2)',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -260,47 +311,13 @@ export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirS
             ))}
           </div>
         </div>
-        <div>
-          <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-3">Stock por sector</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {[...SECTORES_INFO].sort((a, b) => {
-              if (perfil?.sector === a.id) return -1
-              if (perfil?.sector === b.id) return 1
-              return 0
-            }).map(s => {
-              const { Icon } = s
-              const esMio = perfil?.sector === s.id
-              const bloqueado = perfil?.sector && !esMio
-              return (
-                <button key={s.id}
-                  onClick={() => !bloqueado && onAbrirSector(s.id)}
-                  className="card text-left transition-colors group p-5"
-                  style={{ borderLeft: `4px solid ${bloqueado ? '#1e2d42' : s.color}`, borderTop: esMio ? `1px solid ${s.color}40` : '1px solid #1e2d4260', borderRight: esMio ? `1px solid ${s.color}40` : '1px solid #1e2d4260', borderBottom: esMio ? `1px solid ${s.color}40` : '1px solid #1e2d4260', borderRadius: '0 12px 12px 0', background: esMio ? s.color + '0a' : '#0d182940', opacity: bloqueado ? 0.45 : 1, cursor: bloqueado ? 'not-allowed' : 'pointer' }}>
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: s.color + (bloqueado ? '0a' : '18'), border: `1.5px solid ${s.color}${bloqueado ? '20' : '40'}` }}>
-                      {bloqueado ? <Lock size={22} className="text-slate-600" /> : <Icon size={28} className={s.textColor} />}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className={`text-base font-bold ${bloqueado ? 'text-slate-600' : s.textColor}`}>{s.label}</p>
-                        {esMio && <span style={{fontSize:9,padding:'2px 7px',borderRadius:6,fontWeight:700,background:s.color+'20',color:s.color,border:`1px solid ${s.color}40`}}>Tu sector</span>}
-                      </div>
-                      <p className="text-xs mt-0.5" style={{color: bloqueado ? '#1e3a5f' : '#64748b'}}>{bloqueado ? 'Acceso restringido a tu sector' : s.sub}</p>
-                      {esMio && perfil.rango && <p className="text-xs mt-1" style={{color:s.color+'99'}}>{perfil.rango}</p>}
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
+      <SectoresHero perfil={perfil} onAbrirSector={onAbrirSector} />
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-semibold text-white">
@@ -427,54 +444,6 @@ export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirS
           No hay viajes en este período.
         </div>
       )}
-
-      {/* Sectores a bordo */}
-      <div>
-        <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-3">Stock por sector</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {[...SECTORES_INFO].sort((a, b) => {
-            if (perfil?.sector === a.id) return -1
-            if (perfil?.sector === b.id) return 1
-            return 0
-          }).map(s => {
-            const { Icon } = s
-            const esMio = perfil?.sector === s.id
-            const bloqueado = perfil?.sector && !esMio
-            return (
-              <button
-                key={s.id}
-                onClick={() => !bloqueado && onAbrirSector(s.id)}
-                className="card text-left transition-colors group p-5"
-                style={{
-                  borderLeft: `4px solid ${bloqueado ? '#1e2d42' : s.color}`,
-                  borderTop: esMio ? `1px solid ${s.color}40` : '1px solid #1e2d4260',
-                  borderRight: esMio ? `1px solid ${s.color}40` : '1px solid #1e2d4260',
-                  borderBottom: esMio ? `1px solid ${s.color}40` : '1px solid #1e2d4260',
-                  borderRadius: '0 12px 12px 0',
-                  background: esMio ? s.color + '0a' : '#0d182940',
-                  opacity: bloqueado ? 0.45 : 1,
-                  cursor: bloqueado ? 'not-allowed' : 'pointer',
-                }}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: s.color + (bloqueado ? '0a' : '18'), border: `1.5px solid ${s.color}${bloqueado ? '20' : '40'}` }}>
-                    {bloqueado ? <Lock size={22} className="text-slate-600" /> : <Icon size={28} className={s.textColor} />}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className={`text-base font-bold ${bloqueado ? 'text-slate-600' : s.textColor}`}>{s.label}</p>
-                      {esMio && <span style={{fontSize:9,padding:'2px 7px',borderRadius:6,fontWeight:700,background:s.color+'20',color:s.color,border:`1px solid ${s.color}40`}}>Tu sector</span>}
-                    </div>
-                    <p className="text-xs mt-0.5" style={{color: bloqueado ? '#1e3a5f' : '#64748b'}}>{bloqueado ? 'Acceso restringido a tu sector' : s.sub}</p>
-                    {esMio && perfil.rango && <p className="text-xs mt-1" style={{color:s.color+'99'}}>{perfil.rango}</p>}
-                  </div>
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      </div>
 
       <div className="border-t border-navy-700 pt-6">
         <Sponsors />
