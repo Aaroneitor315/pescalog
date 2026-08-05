@@ -65,7 +65,7 @@ function DolarCards() {
     purple: { border: 'border-purple-500/40',  accent: 'text-purple-400', bar: 'bg-purple-500' },
   }
 
-  const items = cotizaciones ? ['oficial', 'blue', 'mep'].map(k => cotizaciones[k]) : []
+  const items = cotizaciones ? ['oficial', 'blue', 'mep'].map(k => cotizaciones[k]).filter(Boolean) : []
 
   return (
     <div className="card p-0 overflow-hidden">
@@ -100,17 +100,17 @@ function DolarCards() {
       {cotizaciones && (
         <div className="grid grid-cols-3 gap-2 p-2">
           {items.map(item => {
-            const c = colorClass[item.color]
+            const c = colorClass[item.color] || colorClass.blue
             const borderColors = { blue: '#3b82f6', cyan: '#06b6d4', purple: '#8b5cf6' }
             return (
               <div key={item.key} className="rounded-xl px-3 py-3 bg-navy-900"
-                style={{ borderLeft: `3px solid ${borderColors[item.color]}` }}>
+                style={{ borderLeft: `3px solid ${borderColors[item.color] || borderColors.blue}` }}>
                 <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${c.accent}`}>{item.label}</p>
                 <p className="text-lg font-black text-white tabular-nums tracking-tight flip-val" key={flipKey}>
-                  ${item.venta.toLocaleString('es-AR')}
+                  ${(item.venta ?? 0).toLocaleString('es-AR')}
                 </p>
                 <p className="text-[10px] text-slate-500 mt-0.5">
-                  Compra ${item.compra.toLocaleString('es-AR')}
+                  Compra ${(item.compra ?? 0).toLocaleString('es-AR')}
                 </p>
               </div>
             )
