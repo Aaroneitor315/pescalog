@@ -383,6 +383,7 @@ function SectorCard({ s, esMio, onAbrirSector }) {
     const W = 200, H = 130
     cv.width = W * dpr; cv.height = H * dpr
     const ctx = cv.getContext('2d')
+    if (!ctx) return
     ctx.scale(dpr, dpr)
     let t = 0
     function draw() {
