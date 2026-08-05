@@ -277,143 +277,161 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     const cv = hudRef.current
     if (!cv) return
     const ctx = cv.getContext('2d')
-    const W = cv.width, H = cv.height
+    const dpr = window.devicePixelRatio || 1
+    const W = 800, H = 340
+    cv.width = W * dpr; cv.height = H * dpr
+    ctx.scale(dpr, dpr)
     let t = 0
 
-    function gl(c, col, b) { c.shadowColor = col; c.shadowBlur = b }
-    function ng(c) { c.shadowBlur = 0 }
-    function rect(c, x, y, w, h, fill, stroke, sw) {
-      c.fillStyle = fill; c.fillRect(x, y, w, h)
-      if (stroke) { c.strokeStyle = stroke; c.lineWidth = sw || 1; c.strokeRect(x, y, w, h) }
-    }
-    function txt(c, s, x, y, col, size, align, base) {
-      c.fillStyle = col; c.font = size + ' "Courier New"'
-      c.textAlign = align || 'left'; c.textBaseline = base || 'top'; c.fillText(s, x, y)
-    }
-    function gauge(cx, cy, r, val, max, col, lbl, unit) {
-      const s = Math.PI * .75, e = Math.PI * 2.25, f = s + (e - s) * (val / max)
-      ctx.strokeStyle = '#0a1e30'; ctx.lineWidth = 8
-      ctx.beginPath(); ctx.arc(cx, cy, r, s, e); ctx.stroke()
+    // 4 cylinders: cx positions, shared geometry
+    const cyls = [{ x: 80 }, { x: 182 }, { x: 284 }, { x: 386 }]
+    const CY = 52, CH = 108, CW = 72
+    const CRANK_CX = 233, CRANK_CY = 240, CRANK_R = 42
+
+    function gauge(gx, gy, gr, val, max, col, col2, lbl, valLbl) {
+      ctx.fillStyle = '#080e14'; ctx.beginPath(); ctx.arc(gx, gy, gr + 6, 0, Math.PI * 2); ctx.fill()
+      ctx.strokeStyle = 'rgba(180,200,220,.18)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(gx, gy, gr + 6, 0, Math.PI * 2); ctx.stroke()
+      // bg arc
+      ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.lineWidth = gr * .22
+      ctx.beginPath(); ctx.arc(gx, gy, gr * .78, -Math.PI * .8, Math.PI * .8); ctx.stroke()
+      // value arc
+      const ae = -Math.PI * .8 + Math.PI * 1.6 * (val / max)
+      const aG = ctx.createLinearGradient(gx - gr, gy, gx + gr, gy)
+      aG.addColorStop(0, col); aG.addColorStop(1, col2 || col)
+      ctx.strokeStyle = aG; ctx.lineWidth = gr * .22; ctx.shadowColor = col; ctx.shadowBlur = 8
+      ctx.beginPath(); ctx.arc(gx, gy, gr * .78, -Math.PI * .8, ae); ctx.stroke(); ctx.shadowBlur = 0
+      // ticks
       for (let i = 0; i <= 8; i++) {
-        const a = s + (e - s) * i / 8, r1 = i % 2 === 0 ? r - 10 : r - 6
-        ctx.strokeStyle = i % 2 === 0 ? '#1a3a55' : '#0d2035'; ctx.lineWidth = i % 2 === 0 ? 1.5 : 1
-        ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1)
-        ctx.lineTo(cx + Math.cos(a) * (r + 2), cy + Math.sin(a) * (r + 2)); ctx.stroke()
+        const a = -Math.PI * .8 + i * (Math.PI * 1.6 / 8)
+        ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.lineWidth = i % 2 === 0 ? 1.2 : .6
+        ctx.beginPath(); ctx.moveTo(gx + Math.cos(a) * gr * .6, gy + Math.sin(a) * gr * .6)
+        ctx.lineTo(gx + Math.cos(a) * gr * .72, gy + Math.sin(a) * gr * .72); ctx.stroke()
       }
-      gl(ctx, col, 10); ctx.strokeStyle = col; ctx.lineWidth = 8; ctx.lineCap = 'round'
-      ctx.beginPath(); ctx.arc(cx, cy, r, s, f); ctx.stroke()
-      ctx.lineCap = 'butt'; ng(ctx)
-      gl(ctx, col, 6); txt(ctx, String(val), cx, cy - 6, col, 'bold 13px', 'center', 'middle'); ng(ctx)
-      txt(ctx, unit, cx, cy + 8, '#4a7090', '8px', 'center', 'middle')
-      txt(ctx, lbl, cx, cy + r + 10, '#6a90b0', 'bold 8px', 'center', 'top')
+      // needle
+      const na = -Math.PI * .8 + Math.PI * 1.6 * (val / max)
+      ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.shadowColor = col; ctx.shadowBlur = 6
+      ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx + Math.cos(na) * gr * .7, gy + Math.sin(na) * gr * .7); ctx.stroke(); ctx.shadowBlur = 0
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(gx, gy, 3, 0, Math.PI * 2); ctx.fill()
+      ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = `bold ${gr * .28}px "Courier New"`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(valLbl, gx, gy + gr * .18)
+      ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.font = `${gr * .18}px "Courier New"`; ctx.fillText(lbl, gx, gy + gr * .52)
     }
 
     function draw() {
       ctx.clearRect(0, 0, W, H)
-      rect(ctx, 0, 0, W, H, '#02080f')
-      // grid
-      ctx.strokeStyle = '#06182a'; ctx.lineWidth = .4
+      // bg + grid
+      ctx.fillStyle = '#020a14'; ctx.fillRect(0, 0, W, H)
+      ctx.strokeStyle = 'rgba(0,100,180,.06)'; ctx.lineWidth = .5
       for (let x = 0; x < W; x += 20) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke() }
       for (let y = 0; y < H; y += 20) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke() }
 
-      // header
-      rect(ctx, 0, 0, W, 26, '#04111e')
-      gl(ctx, '#00d4ff', 6); txt(ctx, '◉  SALA DE MÁQUINAS  ·  FICHA TÉCNICA', 12, 7, '#00d4ff', 'bold 9px'); ng(ctx)
-      const hh = Math.floor(t / 3600) % 24, mm = Math.floor(t / 60) % 60
-      txt(ctx, String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'), W - 10, 8, '#2a5a80', '8px', 'right')
-
-      // AUX dimensions
-      const aw = Math.round(W * 0.155), ah = 110, ay = 68
-      const ax1 = Math.round(W * 0.04), ax2 = W - ax1 - aw
-
-      // AUX 1
-      rect(ctx, ax1, ay, aw, ah, '#030e18', '#1a4a6a', 1.5)
-      gl(ctx, '#00ff9d', 4); ctx.fillStyle = '#00ff9d'; ctx.fillRect(ax1, ay, aw, 2); ng(ctx)
-      txt(ctx, 'AUXILIAR 1', ax1 + aw / 2, ay + 5, '#2a7a50', 'bold 7px', 'center')
-      for (let i = 0; i < 3; i++) {
-        const px = ax1 + 10 + i * (Math.round(aw / 3) - 2), ph = Math.sin(t * .06 + i * 2.1) * 12
-        rect(ctx, px, ay + 28, Math.round(aw / 3) - 6, 44, '#0a2030', '#1a4a5a', 1)
-        gl(ctx, '#00ff9d', 6); rect(ctx, px + 2, ay + 30 + ph, Math.round(aw / 3) - 10, 16, '#00ff9d60'); ng(ctx)
+      // crankshaft rail
+      ctx.strokeStyle = 'rgba(0,150,255,.14)'; ctx.lineWidth = 2
+      ctx.beginPath(); ctx.moveTo(40, CRANK_CY); ctx.lineTo(470, CRANK_CY); ctx.stroke()
+      // crankshaft circle + arms
+      ctx.save(); ctx.translate(CRANK_CX, CRANK_CY); ctx.rotate(t * .04)
+      ctx.strokeStyle = 'rgba(0,150,255,.32)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, CRANK_R, 0, Math.PI * 2); ctx.stroke()
+      for (let ci = 0; ci < 4; ci++) {
+        const ca = ci * Math.PI * .5
+        ctx.strokeStyle = 'rgba(0,180,255,.48)'; ctx.lineWidth = 3
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(ca) * CRANK_R, Math.sin(ca) * CRANK_R); ctx.stroke()
+        ctx.fillStyle = 'rgba(0,200,255,.7)'; ctx.beginPath(); ctx.arc(Math.cos(ca) * CRANK_R, Math.sin(ca) * CRANK_R, 5, 0, Math.PI * 2); ctx.fill()
       }
-      txt(ctx, '85 kW · 1800 rpm', ax1 + aw / 2, ay + ah - 16, '#1a5040', '7px', 'center')
-      gl(ctx, '#00ff9d', 10); ctx.fillStyle = '#00ff9d'
-      ctx.beginPath(); ctx.arc(ax1 + aw - 10, ay + 11, 4, 0, Math.PI * 2); ctx.fill(); ng(ctx)
+      ctx.restore()
 
-      // AUX 2
-      rect(ctx, ax2, ay, aw, ah, '#030e18', '#1a4a6a', 1.5)
-      gl(ctx, '#00ff9d', 4); ctx.fillStyle = '#00ff9d'; ctx.fillRect(ax2, ay, aw, 2); ng(ctx)
-      txt(ctx, 'AUXILIAR 2', ax2 + aw / 2, ay + 5, '#2a7a50', 'bold 7px', 'center')
-      for (let i = 0; i < 3; i++) {
-        const px = ax2 + 10 + i * (Math.round(aw / 3) - 2), ph = Math.sin(t * .06 + i * 2.1 + Math.PI) * 12
-        rect(ctx, px, ay + 28, Math.round(aw / 3) - 6, 44, '#0a2030', '#1a4a5a', 1)
-        gl(ctx, '#00ff9d', 6); rect(ctx, px + 2, ay + 30 + ph, Math.round(aw / 3) - 10, 16, '#00ff9d60'); ng(ctx)
-      }
-      txt(ctx, '85 kW · 1800 rpm', ax2 + aw / 2, ay + ah - 16, '#1a5040', '7px', 'center')
-      gl(ctx, '#00ff9d', 10); ctx.fillStyle = '#00ff9d'
-      ctx.beginPath(); ctx.arc(ax2 + aw - 10, ay + 11, 4, 0, Math.PI * 2); ctx.fill(); ng(ctx)
+      // cylinders
+      cyls.forEach((c, i) => {
+        const phase = i * Math.PI * .5
+        const crankAngle = t * .04 + phase
+        const pistonY = CRANK_CY - CRANK_R * Math.sin(crankAngle) - 58
 
-      // Motor principal
-      const mx = Math.round(W * .28), mw = Math.round(W * .44), my = 42, mh = 140
-      rect(ctx, mx, my, mw, mh, '#040f1a', '#00d4ff', 2)
-      gl(ctx, '#00d4ff', 4); ctx.fillStyle = '#00d4ff'; ctx.fillRect(mx, my, mw, 3); ng(ctx)
-      txt(ctx, 'MOTOR PRINCIPAL', mx + mw / 2, my + 7, '#00d4ff', 'bold 9px', 'center')
-      txt(ctx, 'MAN B&W  ·  374 kW', mx + mw / 2, my + 18, '#1a5070', '7px', 'center')
-      const ncyl = 6
-      for (let i = 0; i < ncyl; i++) {
-        const cxp = mx + Math.round(mw / (ncyl + 1)) * (i + 1)
-        const cw = Math.round(mw / (ncyl + 1)) - 6
-        const ph = Math.sin(t * .055 + i * 1.047) * 20
-        rect(ctx, cxp - cw / 2, my + 34, cw, 58, '#060f1c', '#0d2a40', 1)
-        gl(ctx, '#00d4ff', 8); rect(ctx, cxp - cw / 2 + 2, my + 37 + ph, cw - 4, 18, '#00d4ff30'); ng(ctx)
-        ctx.strokeStyle = '#00d4ff50'; ctx.lineWidth = 1.5
-        ctx.beginPath(); ctx.moveTo(cxp, my + 37 + ph + 9); ctx.lineTo(cxp, my + 96); ctx.stroke()
-        gl(ctx, '#00d4ff', 10); ctx.fillStyle = '#00d4ff80'
-        ctx.beginPath(); ctx.arc(cxp, my + 100 + Math.sin(t * .055 + i * 1.047) * 5, 3, 0, Math.PI * 2); ctx.fill(); ng(ctx)
-      }
-      // crankshaft
-      ctx.strokeStyle = '#0d3050'; ctx.lineWidth = 3
-      ctx.beginPath(); ctx.moveTo(mx + 10, my + 106); ctx.lineTo(mx + mw - 10, my + 106); ctx.stroke()
-      // shaft lines to aux
-      ctx.strokeStyle = '#0a2535'; ctx.lineWidth = 3
-      ctx.beginPath(); ctx.moveTo(mx, my + mh / 2); ctx.lineTo(ax1 + aw, my + mh / 2); ctx.stroke()
-      ctx.beginPath(); ctx.moveTo(mx + mw, my + mh / 2); ctx.lineTo(ax2, my + mh / 2); ctx.stroke()
-      // hélice arrow
-      gl(ctx, '#00d4ff', 8); ctx.fillStyle = '#00d4ff'
-      ctx.beginPath(); ctx.moveTo(ax1 + aw + 14, my + mh / 2 - 7); ctx.lineTo(ax1 + aw + 2, my + mh / 2); ctx.lineTo(ax1 + aw + 14, my + mh / 2 + 7); ctx.closePath(); ctx.fill(); ng(ctx)
-      txt(ctx, 'HÉLICE', ax1 + aw / 2 + 4, my + mh / 2 + 10, '#1a5070', '7px', 'center')
-
-      // Gauges
-      const gy = Math.round(H * .77)
-      const rpm = Math.round(290 + Math.sin(t * .018) * 28)
-      const temp = Math.round(76 + Math.sin(t * .013) * 6)
-      const pres = Math.round((6.2 + Math.sin(t * .022) * .4) * 10) / 10
-      const volt = Math.round(218 + Math.sin(t * .03) * 6)
-      const gr = Math.round(W * .065)
-      gauge(W / 2 - gr * 3, gy, gr, rpm, 400, '#00d4ff', 'RPM', 'rpm')
-      gauge(W / 2 - gr, gy, gr, temp, 120, '#ff6b1a', 'T°AGUA', '°C')
-      gauge(W / 2 + gr, gy, gr, pres, 10, '#c084fc', 'PRESIÓN', 'bar')
-      gauge(W / 2 + gr * 3, gy, gr, volt, 260, '#00ff9d', 'VOLTAJE', 'V')
-
-      // Tanks
-      const tanks = [
-        { lbl: 'COMB. DF', val: '58.800 L', col: '#e8c432', pct: .62 },
-        { lbl: 'AGUA DULCE', val: '22.830 L', col: '#0a7fff', pct: .78 },
-        { lbl: 'ACEITE LUB.', val: '3.000 L', col: '#00ff9d', pct: .90 },
-        { lbl: 'ACEITE HID.', val: '2.400 L', col: '#c084fc', pct: .55 },
-        { lbl: 'LODOS', val: '1.500 L', col: '#ff6b1a', pct: .30 },
-      ]
-      const tw = Math.round((W - 32) / tanks.length - 6), th = 20, ty = H - 28
-      tanks.forEach((tk, i) => {
-        const tx = 16 + i * (tw + 6)
-        rect(ctx, tx, ty, tw, th, '#040e1a', tk.col + '40', 1)
-        gl(ctx, tk.col, 4); ctx.fillStyle = tk.col + '25'; ctx.fillRect(tx + 1, ty + 1, Math.max(0, (tw - 2) * tk.pct), th - 2); ng(ctx)
-        txt(ctx, tk.lbl, tx + 4, ty + 3, tk.col, 'bold 6px')
-        txt(ctx, tk.val, tx + tw - 4, ty + 11, '#ffffff', '6px', 'right')
+        // cooling jacket
+        const jG = ctx.createLinearGradient(c.x - CW / 2 - 8, 0, c.x + CW / 2 + 8, 0)
+        jG.addColorStop(0, 'rgba(0,100,255,.1)'); jG.addColorStop(.5, 'rgba(0,180,100,.07)'); jG.addColorStop(1, 'rgba(255,60,0,.12)')
+        ctx.fillStyle = jG; ctx.fillRect(c.x - CW / 2 - 8, CY, CW + 16, CH)
+        ctx.strokeStyle = 'rgba(0,140,220,.22)'; ctx.lineWidth = 1; ctx.strokeRect(c.x - CW / 2 - 8, CY, CW + 16, CH)
+        // cylinder bore
+        ctx.fillStyle = '#07121e'; ctx.fillRect(c.x - CW / 2, CY, CW, CH)
+        ctx.strokeStyle = 'rgba(0,180,255,.28)'; ctx.lineWidth = 1.5; ctx.strokeRect(c.x - CW / 2, CY, CW, CH)
+        // combustion glow at TDC
+        const comp = Math.max(0, Math.sin(crankAngle))
+        if (comp > .84) {
+          const ga = (comp - .84) / .16
+          ctx.fillStyle = `rgba(255,140,0,${ga * .28})`; ctx.fillRect(c.x - CW / 2, CY, CW, 24)
+          ctx.shadowColor = '#ff8800'; ctx.shadowBlur = 18 * ga
+          ctx.strokeStyle = `rgba(255,180,0,${ga * .55})`; ctx.lineWidth = 2; ctx.strokeRect(c.x - CW / 2, CY, CW, 24)
+          ctx.shadowBlur = 0
+        }
+        // piston
+        ctx.fillStyle = '#1a3050'; ctx.fillRect(c.x - CW / 2 + 5, pistonY, CW - 10, 22)
+        ctx.strokeStyle = 'rgba(0,200,255,.6)'; ctx.lineWidth = 1.2; ctx.strokeRect(c.x - CW / 2 + 5, pistonY, CW - 10, 22)
+        ;[5, 9, 14].forEach(ry => {
+          ctx.strokeStyle = 'rgba(0,220,255,.32)'; ctx.lineWidth = 1
+          ctx.beginPath(); ctx.moveTo(c.x - CW / 2 + 5, pistonY + ry); ctx.lineTo(c.x + CW / 2 - 5, pistonY + ry); ctx.stroke()
+        })
+        // connecting rod
+        const crankPinY = CRANK_CY + Math.sin(crankAngle) * CRANK_R
+        ctx.strokeStyle = 'rgba(0,160,255,.42)'; ctx.lineWidth = 4; ctx.lineCap = 'round'
+        ctx.beginPath(); ctx.moveTo(c.x, pistonY + 22); ctx.lineTo(c.x, crankPinY); ctx.stroke()
+        ctx.lineCap = 'butt'
+        // valves
+        const vOpen = Math.max(0, Math.sin(crankAngle + Math.PI)) * 7
+        ctx.fillStyle = `rgba(255,80,0,${.38 + vOpen * .06})`; ctx.fillRect(c.x - 22, CY - 12, 9, 12 + vOpen)
+        ctx.fillStyle = `rgba(0,180,255,${.38 + vOpen * .06})`; ctx.fillRect(c.x + 13, CY - 12, 9, 12 + vOpen)
+        ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.font = '5px "Courier New"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+        ctx.fillText('EX', c.x - 17, CY - 16); ctx.fillText('IN', c.x + 17, CY - 16)
       })
-      txt(ctx, 'TANQUES', W / 2, ty - 10, '#1a3a55', 'bold 7px', 'center', 'bottom')
 
-      t++
-      hudRafRef.current = requestAnimationFrame(draw)
+      // TURBOCHARGER
+      const tx = 476, ty2 = 148
+      // exhaust pipe in
+      ctx.strokeStyle = 'rgba(255,140,0,.22)'; ctx.lineWidth = 8
+      ctx.beginPath(); ctx.moveTo(386 + CW / 2, CY + CH / 2); ctx.bezierCurveTo(436, CY + CH / 2, 446, ty2, tx - 32, ty2); ctx.stroke()
+      // charged air out
+      ctx.strokeStyle = 'rgba(0,180,255,.2)'; ctx.lineWidth = 6
+      ctx.beginPath(); ctx.moveTo(tx + 32, ty2); ctx.bezierCurveTo(tx + 55, ty2, tx + 60, ty2 - 50, tx + 60, ty2 - 70); ctx.stroke()
+      // housing
+      ctx.fillStyle = '#0e1c28'; ctx.strokeStyle = 'rgba(255,140,0,.4)'; ctx.lineWidth = 2
+      ctx.beginPath(); ctx.arc(tx, ty2, 30, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+      // rotor
+      ctx.save(); ctx.translate(tx, ty2); ctx.rotate(t * .2)
+      for (let b = 0; b < 6; b++) {
+        const ba = b * Math.PI / 3
+        ctx.fillStyle = 'rgba(255,180,0,.48)'
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 24, ba, ba + .45); ctx.closePath(); ctx.fill()
+      }
+      ctx.restore()
+      ctx.fillStyle = 'rgba(255,180,0,.85)'; ctx.beginPath(); ctx.arc(tx, ty2, 4.5, 0, Math.PI * 2); ctx.fill()
+      ctx.fillStyle = 'rgba(255,180,0,.3)'; ctx.font = '6px "Courier New"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('TURBO', tx, ty2 + 40)
+
+      // oil sump
+      ctx.fillStyle = '#0c1820'; ctx.fillRect(36, 266, 440, 28); ctx.strokeStyle = 'rgba(255,120,0,.28)'; ctx.lineWidth = 1; ctx.strokeRect(36, 266, 440, 28)
+      ctx.fillStyle = 'rgba(255,100,0,.1)'; ctx.fillRect(38, 268, 436, 24)
+      ctx.fillStyle = 'rgba(255,120,0,.38)'; ctx.font = '6px "Courier New"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.fillText('COLECTOR DE ACEITE  ·  MAN B&W  ·  374 kW  ·  6 CILINDROS', 256, 280)
+
+      // GAUGES (right panel)
+      const rpm = Math.round(1820 + Math.sin(t * .018) * 35)
+      const tmp = Math.round(80 + Math.sin(t * .013) * 4)
+      const oil = Math.round((4.1 + Math.sin(t * .02) * .2) * 10) / 10
+      const exh = Math.round(415 + Math.sin(t * .017) * 14)
+      gauge(570, 120, 38, rpm / 2400, 1, '#0a7fff', '#00d4ff', 'RPM', String(rpm))
+      gauge(648, 120, 38, tmp / 100, 1, '#00cc7a', '#e8c432', '°C AGUA', String(tmp))
+      gauge(726, 120, 38, oil / 8, 1, '#e8c432', '#ff6b1a', 'bar ACEITE', oil.toFixed(1))
+      gauge(800 - 38 - 6, 120, 34, exh / 580, 1, '#ff6b1a', '#ff2020', '°C GASES', String(exh))
+
+      // label motor
+      ctx.shadowColor = '#0a7fff'; ctx.shadowBlur = 5
+      ctx.fillStyle = '#0a7fff'; ctx.font = 'bold 8px "Courier New"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.fillText('MOTOR PRINCIPAL · MAN B&W 6L20/27', 233, 36)
+      ctx.shadowBlur = 0
+
+      // header
+      ctx.fillStyle = 'rgba(2,8,18,.92)'; ctx.fillRect(0, 0, W, 18)
+      ctx.shadowColor = '#0a7fff'; ctx.shadowBlur = 4
+      ctx.fillStyle = '#0a7fff'; ctx.font = 'bold 7.5px "Courier New"'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
+      ctx.fillText('◉ MÁQUINAS  ·  CORTE MOTOR  ·  PISTONES · BIELAS · CIGÜEÑAL · TURBO · GAUGES', 10, 9)
+      ctx.shadowBlur = 0
+      t++; hudRafRef.current = requestAnimationFrame(draw)
     }
     draw()
     return () => cancelAnimationFrame(hudRafRef.current)
