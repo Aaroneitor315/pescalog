@@ -843,7 +843,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
   const pendientes = repuestos.filter(r => r.stockActual <= r.stockMinimo)
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#070f1e' }}>
+    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#070f1e', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-navy-700 bg-navy-800 flex-shrink-0">
@@ -1086,8 +1086,8 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
 
         {/* ===== VISTA HUD ANIMADO (solo maquinas) ===== */}
         {vista === 'hud' && seccion === 'maquinas' && (
-          <div style={{ background: '#02080f', display: 'flex', justifyContent: 'center' }}>
-            <canvas ref={hudRef} width={800} height={340} style={{ width: '100%', maxWidth: 700, height: 'auto', display: 'block' }} />
+          <div style={{ background: '#02080f', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100%' }}>
+            <canvas ref={hudRef} style={{ width: '100%', maxWidth: 700, height: 'auto', display: 'block' }} />
           </div>
         )}
 
