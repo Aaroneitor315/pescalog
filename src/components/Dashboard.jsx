@@ -245,7 +245,7 @@ function drawMiniArrastre(ctx, W, H, t) {
   sg.addColorStop(0, '#031828'); sg.addColorStop(1, '#010a18')
   ctx.fillStyle = sg; ctx.fillRect(0, WY, W, H - WY)
 
-  [[18, 8], [50, 5], [90, 12], [140, 4], [172, 9], [35, 20], [120, 17]].forEach(([sx, sy], i) => {
+  ;[[18, 8], [50, 5], [90, 12], [140, 4], [172, 9], [35, 20], [120, 17]].forEach(([sx, sy], i) => {
     ctx.globalAlpha = 0.18 + Math.sin(t * 0.035 + i * 1.4) * 0.12
     ctx.fillStyle = '#cce8ff'; ctx.fillRect(sx, sy, 1, 1)
   }); ctx.globalAlpha = 1
@@ -387,12 +387,16 @@ function SectorCard({ s, esMio, onAbrirSector }) {
     ctx.scale(dpr, dpr)
     let t = 0
     function draw() {
-      ctx.clearRect(0, 0, W, H)
-      if (s.id === 'maquinas') drawMiniMotor(ctx, W, H, t)
-      else if (s.id === 'cubierta') drawMiniArrastre(ctx, W, H, t)
-      else drawMiniRadar(ctx, W, H, t)
-      t++
-      rafRef.current = requestAnimationFrame(draw)
+      try {
+        ctx.clearRect(0, 0, W, H)
+        if (s.id === 'maquinas') drawMiniMotor(ctx, W, H, t)
+        else if (s.id === 'cubierta') drawMiniArrastre(ctx, W, H, t)
+        else drawMiniRadar(ctx, W, H, t)
+        t++
+        rafRef.current = requestAnimationFrame(draw)
+      } catch {
+        cancelAnimationFrame(rafRef.current)
+      }
     }
     draw()
     return () => cancelAnimationFrame(rafRef.current)
