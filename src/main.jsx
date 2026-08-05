@@ -6,25 +6,37 @@ import './index.css'
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props)
-    this.state = { error: null, componentStack: '' }
+    this.state = { error: null }
   }
   static getDerivedStateFromError(e) { return { error: e } }
   componentDidCatch(error, info) {
-    this.setState({ componentStack: info?.componentStack || '' })
+    // El detalle queda en consola para diagnóstico, no en pantalla.
+    console.error('[BitácoraAR]', error, info?.componentStack)
   }
   render() {
     if (this.state.error) {
       return (
-        <div style={{ minHeight: '100vh', background: '#080f1a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 }}>
-          <p style={{ color: '#f87171', fontSize: 12, fontFamily: 'monospace', textAlign: 'center' }}>
-            {this.state.error?.message || String(this.state.error)}
-          </p>
-          <p style={{ color: '#64748b', fontSize: 10, fontFamily: 'monospace', whiteSpace: 'pre-wrap', maxWidth: 360, textAlign: 'left', wordBreak: 'break-all' }}>
-            {this.state.componentStack}
-          </p>
-          <button onClick={() => window.location.reload()} style={{ background: '#0891b2', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, cursor: 'pointer' }}>
+        <div style={{ minHeight: '100vh', boxSizing: 'border-box', background: '#080f1a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 32, textAlign: 'center' }}>
+          <img src="/logo.png" alt="BitácoraAR" style={{ height: 64, width: 'auto', objectFit: 'contain' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <p style={{ color: '#f1f5f9', fontSize: 17, fontWeight: 600, fontFamily: 'system-ui, sans-serif', margin: 0 }}>
+              Algo no cargó bien
+            </p>
+            <p style={{ color: '#94a3b8', fontSize: 14, fontFamily: 'system-ui, sans-serif', margin: 0, lineHeight: 1.5, maxWidth: 300 }}>
+              Tus datos están guardados. Probá de nuevo.
+            </p>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ background: 'linear-gradient(135deg,#0891b2,#06b6d4)', color: '#fff', border: 'none', borderRadius: 12, padding: '11px 32px', fontSize: 15, fontWeight: 700, fontFamily: 'system-ui, sans-serif', cursor: 'pointer', boxShadow: '0 4px 16px rgba(6,182,212,0.3)' }}>
             Reintentar
           </button>
+          <p style={{ color: '#475569', fontSize: 12, fontFamily: 'system-ui, sans-serif', margin: 0, lineHeight: 1.6 }}>
+            ¿Sigue fallando? Escribinos a<br />
+            <a href="mailto:contacto@bitacoraar.com.ar" style={{ color: '#0e7490', textDecoration: 'none' }}>
+              contacto@bitacoraar.com.ar
+            </a>
+          </p>
         </div>
       )
     }
