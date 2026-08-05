@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Navbar from './components/Navbar'
 import Dashboard from './components/Dashboard'
 import HistorialViajes from './components/HistorialViajes'
@@ -45,10 +45,29 @@ export default function App() {
     setTab('nuevo')
   }
 
+  const [timedOut, setTimedOut] = useState(false)
+  useEffect(() => {
+    if (!loading && !cargandoPerfil) return
+    const t = setTimeout(() => setTimedOut(true), 8000)
+    return () => clearTimeout(t)
+  }, [loading, cargandoPerfil])
+
   if (loading || cargandoPerfil) {
+    if (timedOut) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-navy-900">
+          <p className="text-slate-400 text-sm">La conexión tardó demasiado.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-2 rounded-lg bg-cyan-600 text-white text-sm font-semibold">
+            Reintentar
+          </button>
+        </div>
+      )
+    }
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-slate-400 animate-pulse">Cargando...</div>
+      <div className="min-h-screen flex items-center justify-center bg-navy-900">
+        <div className="text-slate-400 animate-pulse text-sm">Cargando...</div>
       </div>
     )
   }
