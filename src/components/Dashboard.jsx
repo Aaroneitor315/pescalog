@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import Sponsors from './Sponsors'
 import { TrendingUp, Fish, Package, Award, DollarSign, Banknote, Waves, Eye, EyeOff, RefreshCw, Plus, Lock } from 'lucide-react'
 import { calcularSingladuras } from '../hooks/useViajes'
@@ -167,6 +167,259 @@ const SECTORES_INFO = [
   },
 ]
 
+// ── Mini animaciones para las tarjetas ──────────────────────────────────────
+
+function drawMiniMotor(ctx, W, H, t) {
+  ctx.fillStyle = '#020a14'; ctx.fillRect(0, 0, W, H)
+  ctx.strokeStyle = 'rgba(0,80,160,.07)'; ctx.lineWidth = 0.5
+  for (let x = 0; x < W; x += 18) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke() }
+  for (let y = 0; y < H; y += 18) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke() }
+
+  const CX = 95, CY = 92, CR = 20
+  const cyls = [{ x: 46 }, { x: 82 }, { x: 118 }]
+  cyls.forEach((c, i) => {
+    const ang = t * 0.045 + (i * Math.PI * 2 / 3)
+    const pisY = CY + Math.sin(ang) * CR - 36
+    const CW = 22
+    const jg = ctx.createLinearGradient(c.x, 14, c.x, 58)
+    jg.addColorStop(0, 'rgba(0,100,220,.3)'); jg.addColorStop(1, 'rgba(180,50,0,.22)')
+    ctx.fillStyle = jg; ctx.fillRect(c.x - CW / 2, 14, CW, 44)
+    ctx.strokeStyle = 'rgba(0,160,255,.25)'; ctx.lineWidth = 0.5; ctx.strokeRect(c.x - CW / 2, 14, CW, 44)
+    ctx.fillStyle = '#010811'; ctx.fillRect(c.x - CW / 2 + 2, 16, CW - 4, 40)
+    const tdc = (Math.sin(ang) + 1) / 2
+    if (tdc > 0.82) { ctx.fillStyle = `rgba(255,140,0,${(tdc - 0.82) * 5})`; ctx.fillRect(c.x - 8, 17, 16, 7) }
+    const pg = ctx.createLinearGradient(c.x - 8, 0, c.x + 8, 0)
+    pg.addColorStop(0, '#2a3a48'); pg.addColorStop(0.5, '#4e606e'); pg.addColorStop(1, '#2a3a48')
+    ctx.fillStyle = pg; ctx.fillRect(c.x - 8, Math.max(18, pisY), 16, 9)
+    ctx.strokeStyle = '#3a5060'; ctx.lineWidth = 1.5; ctx.beginPath()
+    ctx.moveTo(c.x, Math.max(22, pisY + 9))
+    ctx.lineTo(CX - 55 + i * 36 + Math.cos(ang) * CR, CY + Math.sin(ang) * CR); ctx.stroke()
+  })
+
+  ctx.save(); ctx.translate(CX, CY); ctx.rotate(t * 0.045)
+  ctx.strokeStyle = 'rgba(60,110,160,.5)'; ctx.lineWidth = 2.5
+  ctx.beginPath(); ctx.arc(0, 0, CR, 0, Math.PI * 2); ctx.stroke()
+  ctx.fillStyle = '#253545'; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill()
+  ;[0, Math.PI * 2 / 3, Math.PI * 4 / 3].forEach(a => {
+    ctx.fillStyle = '#1e2e3e'
+    ctx.beginPath(); ctx.arc(Math.cos(a) * CR, Math.sin(a) * CR, 2.5, 0, Math.PI * 2); ctx.fill()
+  })
+  ctx.restore()
+
+  const tx = 163, ty = 38
+  ctx.strokeStyle = 'rgba(50,90,130,.4)'; ctx.lineWidth = 1
+  ctx.beginPath(); ctx.arc(tx, ty, 18, 0, Math.PI * 2); ctx.stroke()
+  ctx.save(); ctx.translate(tx, ty); ctx.rotate(t * 0.2)
+  ctx.fillStyle = 'rgba(210,140,0,.85)'
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 14, a, a + Math.PI * 0.32); ctx.closePath(); ctx.fill()
+  }
+  ctx.restore()
+  ctx.fillStyle = '#192530'; ctx.beginPath(); ctx.arc(tx, ty, 4, 0, Math.PI * 2); ctx.fill()
+
+  const gx = 174, gy = 84, gr = 17
+  const rpm = 1850 + Math.sin(t * 0.025) * 45
+  const gS = -Math.PI * 0.78, gE = Math.PI * 0.78, gV = gS + (gE - gS) * (rpm / 2400)
+  ctx.fillStyle = '#080f18'; ctx.beginPath(); ctx.arc(gx, gy, gr + 3, 0, Math.PI * 2); ctx.fill()
+  ctx.strokeStyle = '#0a1a28'; ctx.lineWidth = 4
+  ctx.beginPath(); ctx.arc(gx, gy, gr, gS, gE); ctx.stroke()
+  const ag = ctx.createLinearGradient(gx - gr, gy, gx + gr, gy)
+  ag.addColorStop(0, '#0a7fff'); ag.addColorStop(1, '#00d4ff')
+  ctx.strokeStyle = ag; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(gx, gy, gr, gS, gV); ctx.stroke()
+  ctx.save(); ctx.translate(gx, gy); ctx.rotate(gV)
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(gr - 3, 0); ctx.stroke()
+  ctx.restore()
+  ctx.fillStyle = 'rgba(0,212,255,.7)'; ctx.font = 'bold 5px "Courier New"'; ctx.textAlign = 'center'
+  ctx.fillText(Math.round(rpm), gx, gy + 3)
+
+  ctx.fillStyle = 'rgba(2,8,18,.88)'; ctx.fillRect(0, 0, W, 13)
+  ctx.fillStyle = '#0a7fff'; ctx.font = 'bold 6px "Courier New"'; ctx.textAlign = 'left'
+  ctx.fillText('■ PROPULSIÓN  ·  MOTOR PRINCIPAL', 5, 9)
+}
+
+function drawMiniArrastre(ctx, W, H, t) {
+  const WY = 62
+  ctx.fillStyle = '#010307'; ctx.fillRect(0, 0, W, WY)
+  const sg = ctx.createLinearGradient(0, WY, 0, H)
+  sg.addColorStop(0, '#031828'); sg.addColorStop(1, '#010a18')
+  ctx.fillStyle = sg; ctx.fillRect(0, WY, W, H - WY)
+
+  [[18, 8], [50, 5], [90, 12], [140, 4], [172, 9], [35, 20], [120, 17]].forEach(([sx, sy], i) => {
+    ctx.globalAlpha = 0.18 + Math.sin(t * 0.035 + i * 1.4) * 0.12
+    ctx.fillStyle = '#cce8ff'; ctx.fillRect(sx, sy, 1, 1)
+  }); ctx.globalAlpha = 1
+
+  ctx.strokeStyle = 'rgba(10,70,130,.5)'; ctx.lineWidth = 1
+  ctx.beginPath()
+  for (let x = 0; x <= W; x += 2) {
+    const y = WY + Math.sin(x * 0.05 + t * 0.03) * 1.8 + Math.sin(x * 0.015 + t * 0.02) * 0.9
+    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+  }; ctx.stroke()
+
+  const bob = Math.sin(t * 0.025) * 0.5
+  ctx.fillStyle = '#1e2e40'; ctx.beginPath()
+  ctx.moveTo(8, WY + bob); ctx.lineTo(5, WY - 4 + bob)
+  ctx.bezierCurveTo(3, WY - 12 + bob, 7, WY - 20 + bob, 18, WY - 24 + bob)
+  ctx.lineTo(32, WY - 27 + bob); ctx.lineTo(88, WY - 27 + bob)
+  ctx.lineTo(96, WY - 16 + bob); ctx.lineTo(96, WY + bob); ctx.closePath(); ctx.fill()
+  ctx.fillStyle = '#080f1a'; ctx.beginPath()
+  ctx.moveTo(8, WY + bob); ctx.bezierCurveTo(3, WY + 9 + bob, 2, WY + 22 + bob, 10, WY + 30 + bob)
+  ctx.bezierCurveTo(35, WY + 38 + bob, 75, WY + 40 + bob, 88, WY + 36 + bob)
+  ctx.bezierCurveTo(94, WY + 31 + bob, 96, WY + 18 + bob, 96, WY + bob); ctx.closePath(); ctx.fill()
+  ctx.strokeStyle = '#9a1010'; ctx.lineWidth = 2.5; ctx.beginPath()
+  ctx.moveTo(10, WY + 2 + bob); ctx.bezierCurveTo(40, WY + 6 + bob, 70, WY + 7 + bob, 90, WY + 5 + bob); ctx.stroke()
+
+  ctx.strokeStyle = '#5a7088'; ctx.lineWidth = 3
+  ctx.beginPath(); ctx.moveTo(30, WY - 27 + bob); ctx.lineTo(30, WY - 60 + bob); ctx.stroke()
+  const blink = 0.6 + Math.sin(t * 0.07) * 0.35
+  ctx.fillStyle = `rgba(255,255,220,${blink})`; ctx.shadowColor = '#ffffcc'; ctx.shadowBlur = 8 * blink
+  ctx.beginPath(); ctx.arc(30, WY - 62 + bob, 2.5, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0
+  ctx.fillStyle = '#00ee44'; ctx.shadowColor = '#00ff44'; ctx.shadowBlur = 6
+  ctx.beginPath(); ctx.arc(64, WY - 14 + bob, 2.5, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0
+
+  const ws = Math.sin(t * 0.022) * 0.5
+  ctx.shadowColor = '#e8c432'; ctx.shadowBlur = 4; ctx.strokeStyle = '#e8c432'; ctx.lineWidth = 1.5
+  ctx.beginPath(); ctx.moveTo(96, WY + bob); ctx.bezierCurveTo(128, WY + 18 + ws, 148, WY + 34 + ws, 160, WY + 44); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(96, WY + bob); ctx.bezierCurveTo(130, WY + 24 + ws, 150, WY + 40 + ws, 160, WY + 54); ctx.stroke()
+  ctx.shadowBlur = 0
+
+  const bx = 160, byt = WY + 44, byb = WY + 54, sx = W - 8, sy = WY + 49 + Math.sin(t * 0.02) * 1.2
+  ctx.shadowColor = '#00ff9d'; ctx.shadowBlur = 3; ctx.strokeStyle = 'rgba(0,255,157,.7)'; ctx.lineWidth = 1.2
+  ctx.beginPath(); ctx.moveTo(bx, byt); ctx.bezierCurveTo(bx + 20, byt + 2, bx + 24, sy - 5, sx, sy); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(bx, byb); ctx.bezierCurveTo(bx + 20, byb - 2, bx + 24, sy + 5, sx, sy); ctx.stroke()
+  ctx.shadowBlur = 0
+
+  const peces = [{ x: 108, r: 1.1, ph: 0.3 }, { x: 130, r: 1.4, ph: 1.1 }, { x: 150, r: 1.0, ph: 2.2 }]
+  peces.forEach(p => {
+    const py = WY + 49 + Math.sin(t * 0.04 + p.ph) * 3
+    ctx.globalAlpha = 0.75; ctx.fillStyle = '#00d4ff'
+    ctx.beginPath(); ctx.arc(p.x + (t * 0.3 % 50) - 5, py, p.r * 1.5, 0, Math.PI * 2); ctx.fill()
+    ctx.globalAlpha = 1
+  })
+
+  ctx.fillStyle = 'rgba(1,3,7,.88)'; ctx.fillRect(0, 0, W, 13)
+  ctx.fillStyle = '#0a7fff'; ctx.font = 'bold 6px "Courier New"'; ctx.textAlign = 'left'
+  ctx.fillText('■ ARRASTRE  ·  PÓRTICO · WARPS · RED', 5, 9)
+}
+
+function drawMiniRadar(ctx, W, H, t) {
+  ctx.fillStyle = '#021208'; ctx.fillRect(0, 0, W, H)
+  ctx.strokeStyle = 'rgba(0,80,20,.1)'; ctx.lineWidth = 0.5
+  for (let x = 0; x < W; x += 16) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke() }
+  for (let y = 0; y < H; y += 16) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke() }
+
+  const rx = 56, ry = 68, rr = 46
+  for (let i = 1; i <= 3; i++) {
+    ctx.strokeStyle = `rgba(0,200,80,${0.08 + i * 0.04})`; ctx.lineWidth = 0.8
+    ctx.beginPath(); ctx.arc(rx, ry, rr * i / 3, 0, Math.PI * 2); ctx.stroke()
+  }
+  ctx.strokeStyle = 'rgba(0,180,70,.12)'; ctx.lineWidth = 0.5
+  ;[0, 45, 90, 135].forEach(deg => {
+    const a = (deg * Math.PI) / 180
+    ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx + Math.cos(a) * rr, ry + Math.sin(a) * rr)
+    ctx.lineTo(rx - Math.cos(a) * rr, ry - Math.sin(a) * rr); ctx.stroke()
+  })
+
+  const sweepAngle = (t * 0.04) % (Math.PI * 2)
+  const sg = ctx.createConicalGradient ? null : null
+  ctx.save(); ctx.translate(rx, ry)
+  const sweepG = ctx.createLinearGradient(0, 0, Math.cos(sweepAngle) * rr, Math.sin(sweepAngle) * rr)
+  sweepG.addColorStop(0, 'rgba(0,255,100,.55)'); sweepG.addColorStop(1, 'rgba(0,255,100,.0)')
+  ctx.fillStyle = sweepG
+  ctx.beginPath(); ctx.moveTo(0, 0)
+  ctx.arc(0, 0, rr, sweepAngle - 0.6, sweepAngle)
+  ctx.closePath(); ctx.fill(); ctx.restore()
+
+  const blips = [{ a: 1.1, d: 0.65 }, { a: 3.8, d: 0.42 }]
+  blips.forEach(b => {
+    const bx2 = rx + Math.cos(b.a) * rr * b.d, by2 = ry + Math.sin(b.a) * rr * b.d
+    const blipAlpha = 0.4 + Math.sin(t * 0.05 + b.a) * 0.35
+    ctx.fillStyle = `rgba(0,255,100,${blipAlpha})`; ctx.shadowColor = '#00ff64'; ctx.shadowBlur = 5
+    ctx.beginPath(); ctx.arc(bx2, by2, 2, 0, Math.PI * 2); ctx.fill()
+  }); ctx.shadowBlur = 0
+
+  const gx = 158, gy = 55, gr = 30
+  const rpm = 1850 + Math.sin(t * 0.025) * 40
+  const gS = -Math.PI * 0.75, gE = Math.PI * 0.75, gV = gS + (gE - gS) * (rpm / 2400)
+  ctx.fillStyle = '#030e07'; ctx.beginPath(); ctx.arc(gx, gy, gr + 4, 0, Math.PI * 2); ctx.fill()
+  ctx.strokeStyle = 'rgba(0,80,30,.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(gx, gy, gr + 4, 0, Math.PI * 2); ctx.stroke()
+  ctx.strokeStyle = '#071a0e'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(gx, gy, gr, gS, gE); ctx.stroke()
+  const arcG = ctx.createLinearGradient(gx - gr, gy, gx + gr, gy)
+  arcG.addColorStop(0, '#00aa44'); arcG.addColorStop(1, '#00ff88')
+  ctx.strokeStyle = arcG; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(gx, gy, gr, gS, gV); ctx.stroke()
+  ctx.save(); ctx.translate(gx, gy); ctx.rotate(gV)
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(gr - 5, 0); ctx.stroke()
+  ctx.restore()
+  ctx.fillStyle = '#00ff88'; ctx.font = 'bold 6px "Courier New"'; ctx.textAlign = 'center'
+  ctx.fillText(Math.round(rpm), gx, gy + 4)
+  ctx.fillStyle = 'rgba(0,200,80,.6)'; ctx.font = '5px "Courier New"'
+  ctx.fillText('RPM', gx, gy + gr - 2)
+
+  const tx2 = gx, ty2 = 108
+  ctx.strokeStyle = 'rgba(180,180,200,.55)'; ctx.lineWidth = 1.5
+  ctx.beginPath(); ctx.moveTo(tx2 - 24, ty2); ctx.lineTo(tx2 + 24, ty2); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(tx2, ty2 - 14); ctx.lineTo(tx2, ty2 + 3); ctx.stroke()
+  ctx.fillStyle = 'rgba(210,210,230,.5)'; ctx.beginPath(); ctx.arc(tx2 - 24, ty2, 3, 0, Math.PI * 2); ctx.fill()
+  ctx.beginPath(); ctx.arc(tx2 + 24, ty2, 3, 0, Math.PI * 2); ctx.fill()
+  ctx.strokeStyle = 'rgba(200,200,220,.35)'; ctx.lineWidth = 8; ctx.lineCap = 'round'
+  ctx.beginPath(); ctx.moveTo(tx2 - 14, ty2 - 6); ctx.lineTo(tx2 - 14, ty2 + 6); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(tx2 + 14, ty2 - 6); ctx.lineTo(tx2 + 14, ty2 + 6); ctx.stroke()
+  ctx.lineCap = 'butt'
+
+  ctx.fillStyle = 'rgba(2,18,8,.88)'; ctx.fillRect(0, 0, W, 13)
+  ctx.fillStyle = '#00cc66'; ctx.font = 'bold 6px "Courier New"'; ctx.textAlign = 'left'
+  ctx.fillText('■ PUENTE  ·  RADAR · RPM · TIMONEL', 5, 9)
+}
+
+function SectorCard({ s, esMio, onAbrirSector }) {
+  const canvasRef = useRef()
+  const rafRef = useRef()
+
+  useEffect(() => {
+    const cv = canvasRef.current
+    if (!cv) return
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const W = 200, H = 130
+    cv.width = W * dpr; cv.height = H * dpr
+    const ctx = cv.getContext('2d')
+    ctx.scale(dpr, dpr)
+    let t = 0
+    function draw() {
+      ctx.clearRect(0, 0, W, H)
+      if (s.id === 'maquinas') drawMiniMotor(ctx, W, H, t)
+      else if (s.id === 'cubierta') drawMiniArrastre(ctx, W, H, t)
+      else drawMiniRadar(ctx, W, H, t)
+      t++
+      rafRef.current = requestAnimationFrame(draw)
+    }
+    draw()
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [s.id])
+
+  return (
+    <button
+      onClick={() => onAbrirSector(s.id)}
+      className="flex flex-col rounded-2xl overflow-hidden transition-all active:scale-95"
+      style={{
+        background: esMio ? s.color + '14' : s.color + '0d',
+        border: `1.5px solid ${esMio ? s.color + '60' : s.color + '30'}`,
+        boxShadow: esMio ? `0 0 18px ${s.color}18` : 'none',
+      }}
+    >
+      <canvas ref={canvasRef} style={{ width: '100%', height: 'auto', display: 'block' }} />
+      <div className="px-2 pt-1.5 pb-2.5 text-center">
+        <p className="text-xs font-bold leading-tight" style={{ color: s.color }}>{s.label}</p>
+        {esMio
+          ? <span className="mt-1 inline-block text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+              style={{ background: s.color + '20', color: s.color }}>Tu sector</span>
+          : <p className="text-[9px] mt-0.5" style={{ color: '#2a4a6a' }}>{s.sub.split('·')[0].trim()}</p>
+        }
+      </div>
+    </button>
+  )
+}
+
 function SectoresHero({ perfil, onAbrirSector }) {
   const sorted = [...SECTORES_INFO].sort((a, b) => {
     if (perfil?.sector === a.id) return -1
@@ -177,36 +430,9 @@ function SectoresHero({ perfil, onAbrirSector }) {
     <div>
       <p className="text-[10px] text-slate-600 uppercase tracking-widest font-semibold mb-2.5 px-0.5">Sectores a bordo</p>
       <div className="grid grid-cols-3 gap-2.5">
-        {sorted.map(s => {
-          const { Icon } = s
-          const esMio = perfil?.sector === s.id
-          return (
-            <button
-              key={s.id}
-              onClick={() => onAbrirSector(s.id)}
-              className="flex flex-col items-center text-center rounded-2xl py-4 px-2 transition-all active:scale-95"
-              style={{
-                background: esMio ? s.color + '14' : s.color + '0d',
-                border: `1.5px solid ${esMio ? s.color + '60' : s.color + '30'}`,
-                cursor: 'pointer',
-                boxShadow: esMio ? `0 0 18px ${s.color}18` : 'none',
-              }}
-            >
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-2.5"
-                style={{ background: s.color + '1a', border: `1.5px solid ${s.color + '40'}` }}>
-                <Icon size={24} className={s.textColor} />
-              </div>
-              <p className="text-xs font-bold leading-tight" style={{ color: s.color }}>{s.label}</p>
-              {esMio && (
-                <span className="mt-1 text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
-                  style={{ background: s.color + '20', color: s.color }}>Tu sector</span>
-              )}
-              {!esMio && (
-                <p className="text-[9px] mt-0.5" style={{ color: '#2a4a6a' }}>{s.sub.split('·')[0].trim()}</p>
-              )}
-            </button>
-          )
-        })}
+        {sorted.map(s => (
+          <SectorCard key={s.id} s={s} esMio={perfil?.sector === s.id} onAbrirSector={onAbrirSector} />
+        ))}
       </div>
     </div>
   )
