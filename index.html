@@ -14,6 +14,26 @@
     <title>BitácoraAR</title>
   </head>
   <body>
+    <script>
+      // Fuerza limpieza del service worker viejo (una sola vez por version)
+      (function(){
+        var key='sw_reset_v4';
+        if(localStorage.getItem(key)) return;
+        localStorage.setItem(key,'1');
+        if(!('serviceWorker' in navigator)) return;
+        navigator.serviceWorker.getRegistrations().then(function(regs){
+          if(!regs.length) return;
+          Promise.all(regs.map(function(r){return r.unregister()}))
+            .then(function(){
+              return caches.keys();
+            }).then(function(keys){
+              return Promise.all(keys.map(function(k){return caches.delete(k)}));
+            }).then(function(){
+              window.location.reload();
+            });
+        });
+      })();
+    </script>
     <div id="root">
       <style>#boot-loader{position:fixed;inset:0;background:#080f1a;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999}#boot-spinner{width:40px;height:40px;border:3px solid #112240;border-top-color:#06b6d4;border-radius:50%;animation:boot-spin 1s linear infinite;margin-bottom:14px}#boot-label{color:#475569;font-family:system-ui,sans-serif;font-size:13px;letter-spacing:.05em}@keyframes boot-spin{to{transform:rotate(360deg)}}</style>
       <div id="boot-loader"><div id="boot-spinner"></div><span id="boot-label">BitácoraAR</span></div>
