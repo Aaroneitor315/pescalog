@@ -27,6 +27,8 @@ export function usePerfil(uid) {
     getDoc(ref).then(snap => {
       setPerfil(snap.exists() ? snap.data() : null)
       setCargando(false)
+    }).catch(() => {
+      setCargando(false)
     })
   }, [uid])
 
