@@ -43,28 +43,36 @@ const SECTORES = {
 const CATEGORIAS_MAQUINAS = ['Filtro aceite', 'Filtro combustible', 'Filtro aire', 'Filtro hidráulico', 'Correa', 'Rodamiento', 'Junta', 'Otro']
 const CATEGORIAS_CUBIERTA = ['Cable acero', 'Malleta', 'Grillete', 'Brida', 'Cable combinado', 'Cabo culo bolsa', 'Francés', 'Euroline', 'Otro']
 
-function preprocesarImagen(file, escala = 2) {
+let _ocrWorker = null
+
+async function getOCRWorker() {
+  if (_ocrWorker) return _ocrWorker
+  _ocrWorker = await createWorker('eng')
+  return _ocrWorker
+}
+
+function preprocesarImagen(file) {
   return new Promise(resolve => {
     const img = new Image()
     img.onload = () => {
       const canvas = document.createElement('canvas')
-      // Escalar imagen para dar más píxeles por carácter al OCR
-      canvas.width = img.width * escala
-      canvas.height = img.height * escala
+      const MAX_PX = 800
+      const escala = Math.min(1.5, MAX_PX / Math.max(img.width, img.height))
+      canvas.width = Math.round(img.width * escala)
+      canvas.height = Math.round(img.height * escala)
       const ctx = canvas.getContext('2d')
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
       const d = imageData.data
       for (let i = 0; i < d.length; i += 4) {
         const lum = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2]
-        // Umbral adaptativo: texto oscuro→negro, fondo claro→blanco
         const c = lum < 140
           ? Math.max(0, lum * 0.5)
           : Math.min(255, 128 + (lum - 128) * 1.8)
         d[i] = d[i+1] = d[i+2] = c
       }
       ctx.putImageData(imageData, 0, 0)
-      canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.92)
+      canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.88)
     }
     img.src = URL.createObjectURL(file)
   })
@@ -327,21 +335,12 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     const preview = URL.createObjectURL(blob)
     setForm(f => ({ ...f, fotoBlob: blob, fotoPreview: preview, foto: preview }))
     try {
-      const imagenProcesada = await preprocesarImagen(file, 2)
-      const worker = await createWorker('eng')
-      // Pasada 1: PSM 7 = línea de texto única (mejor para etiquetas con código solo)
-      await worker.setParameters({ tessedit_pageseg_mode: '7' })
-      const { data: { text: text7 } } = await worker.recognize(imagenProcesada)
-      // Pasada 2: PSM 11 = texto disperso (mejor para etiquetas con múltiples textos)
+      const imagenProcesada = await preprocesarImagen(file)
+      const worker = await getOCRWorker()
       await worker.setParameters({ tessedit_pageseg_mode: '11' })
-      const { data: { text: text11 } } = await worker.recognize(imagenProcesada)
-      await worker.terminate()
-      const codigo7 = extraerCodigo(text7)
-      const codigo11 = extraerCodigo(text11)
-      // Preferir el que matchea un patrón de marca conocida (más específico)
-      const codigo = codigo7.length >= codigo11.length ? codigo7 : codigo11
-      const texto = (text7 + '\n' + text11).trim()
-      setOcr({ activo: true, progreso: false, texto, codigo })
+      const { data: { text } } = await worker.recognize(imagenProcesada)
+      const codigo = extraerCodigo(text)
+      setOcr({ activo: true, progreso: false, texto: text.trim(), codigo })
       setForm(f => ({ ...f, codigo: codigo || f.codigo }))
     } catch {
       setOcr({ activo: true, progreso: false, texto: '', codigo: '' })
