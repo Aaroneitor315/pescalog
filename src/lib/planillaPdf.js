@@ -311,20 +311,22 @@ export async function generarPlanillaPeriodo({ periodo, libreta, perfil, fichaMo
   return { bytes: await pdf.save(), overlay: false }
 }
 
-// Descarga o comparte el PDF. Usa el share nativo de la PWA si está disponible.
-export async function exportarPlanilla({ bytes, nombreArchivo }) {
-  const blob = new Blob([bytes], { type: 'application/pdf' })
-  const file = new File([blob], nombreArchivo, { type: 'application/pdf' })
-
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file], title: 'Planilla de singladuras' })
-      return 'compartido'
-    } catch (e) {
-      if (e?.name === 'AbortError') return 'cancelado'
-    }
+// ¿El dispositivo puede compartir archivos por el share nativo? (típicamente
+// móvil). En escritorio esto suele dar false o abrir una hoja inútil, por eso
+// la descarga es siempre el camino por defecto y compartir es opcional.
+export function puedeCompartirArchivos() {
+  try {
+    if (!navigator.canShare || typeof navigator.share !== 'function') return false
+    const probe = new File([new Uint8Array([0])], 'probe.pdf', { type: 'application/pdf' })
+    return navigator.canShare({ files: [probe] })
+  } catch {
+    return false
   }
+}
 
+// Descarga directa del PDF (método confiable en escritorio y móvil).
+export function descargarPlanilla({ bytes, nombreArchivo }) {
+  const blob = new Blob([bytes], { type: 'application/pdf' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -332,6 +334,21 @@ export async function exportarPlanilla({ bytes, nombreArchivo }) {
   document.body.appendChild(a)
   a.click()
   a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  setTimeout(() => URL.revokeObjectURL(url), 1500)
   return 'descargado'
+}
+
+// Comparte el PDF por el share nativo. Devuelve 'compartido' | 'cancelado' |
+// 'no-soportado' | 'error'.
+export async function compartirPlanilla({ bytes, nombreArchivo }) {
+  const blob = new Blob([bytes], { type: 'application/pdf' })
+  const file = new File([blob], nombreArchivo, { type: 'application/pdf' })
+  if (!puedeCompartirArchivos()) return 'no-soportado'
+  try {
+    await navigator.share({ files: [file], title: 'Planilla de singladuras' })
+    return 'compartido'
+  } catch (e) {
+    if (e?.name === 'AbortError') return 'cancelado'
+    return 'error'
+  }
 }

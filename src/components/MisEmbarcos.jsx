@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react'
-import { Anchor, FileText, Ship, Calendar, AlertCircle, X, Download, Loader, CheckCircle } from 'lucide-react'
+import { useState, useMemo, useEffect } from 'react'
+import { Anchor, FileText, Ship, Calendar, AlertCircle, X, Download, Loader, CheckCircle, Share2, ArrowLeft } from 'lucide-react'
 import { getDoc, doc } from 'firebase/firestore'
 import { db } from '../firebase'
 import { agruparEmbarcos, validarPeriodo } from '../lib/embarcos'
-import { generarPlanillaPeriodo, exportarPlanilla } from '../lib/planillaPdf'
+import { generarPlanillaPeriodo, descargarPlanilla, compartirPlanilla, puedeCompartirArchivos } from '../lib/planillaPdf'
 
 function fmtFecha(iso) {
   if (!iso) return '—'
@@ -18,10 +18,17 @@ function slug(s) {
 // ─── Modal de generación de planilla ────────────────────────────────────────
 function ModalPlanilla({ periodo, uid, libreta, perfil, onCerrar }) {
   const [modo, setModo] = useState('singladuras')
-  const [estado, setEstado] = useState('idle') // idle | generando | ok | error
+  const [paso, setPaso] = useState('config')   // config | preview
+  const [estado, setEstado] = useState('idle')  // idle | generando | error
   const [mensaje, setMensaje] = useState('')
+  // Resultado generado: bytes, blob URL para el preview, nombre, overlay
+  const [pdf, setPdf] = useState(null)
 
   const validacion = validarPeriodo(periodo)
+  const puedeCompartir = puedeCompartirArchivos()
+
+  // Liberar el blob URL al desmontar o al regenerar
+  useEffect(() => () => { if (pdf?.url) URL.revokeObjectURL(pdf.url) }, [pdf])
 
   async function generar(debugGrid = false) {
     if (!validacion.ok) return
@@ -38,135 +45,200 @@ function ModalPlanilla({ periodo, uid, libreta, perfil, onCerrar }) {
       const { bytes, overlay } = await generarPlanillaPeriodo({ periodo, libreta, perfil, fichaMotor, modo, debugGrid })
       const sufijo = debugGrid ? '-CALIBRACION' : ''
       const nombreArchivo = `planilla-${slug(periodo.barco)}-${periodo.fechaEmbarco || 'periodo'}${sufijo}.pdf`
-      const resultado = await exportarPlanilla({ bytes, nombreArchivo })
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
 
-      setEstado('ok')
-      setMensaje(
-        (resultado === 'compartido' ? 'Planilla compartida.' :
-         resultado === 'cancelado' ? 'Compartir cancelado; el PDF quedó listo.' :
-         'Planilla descargada.') +
-        (overlay ? '' : ' (Layout preliminar — falta la plantilla oficial en public/planilla-refocapemm.pdf)')
-      )
+      setPdf({ bytes, url, nombreArchivo, overlay, debugGrid })
+      setEstado('idle')
+      setPaso('preview')
     } catch (e) {
       setEstado('error')
       setMensaje('No se pudo generar el PDF: ' + (e?.message || 'error desconocido'))
     }
   }
 
+  function volverAConfig() {
+    if (pdf?.url) URL.revokeObjectURL(pdf.url)
+    setPdf(null)
+    setMensaje('')
+    setPaso('config')
+  }
+
+  function handleDescargar() {
+    if (!pdf) return
+    descargarPlanilla({ bytes: pdf.bytes, nombreArchivo: pdf.nombreArchivo })
+    setMensaje('Planilla descargada.')
+  }
+
+  async function handleCompartir() {
+    if (!pdf) return
+    const r = await compartirPlanilla({ bytes: pdf.bytes, nombreArchivo: pdf.nombreArchivo })
+    setMensaje(
+      r === 'compartido' ? 'Planilla compartida.' :
+      r === 'cancelado' ? 'Compartir cancelado; podés descargarla.' :
+      r === 'no-soportado' ? 'Este dispositivo no permite compartir; usá Descargar.' :
+      'No se pudo compartir; usá Descargar.'
+    )
+  }
+
   const total = modo === 'dias' ? periodo.totalDiasEmbarcado : periodo.totalSingladuras
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4" onClick={onCerrar}>
-      <div className="bg-navy-800 border border-navy-600 rounded-2xl w-full max-w-md shadow-xl flex flex-col max-h-[85vh]"
+      <div className={`bg-navy-800 border border-navy-600 rounded-2xl w-full shadow-xl flex flex-col max-h-[90vh] ${paso === 'preview' ? 'max-w-2xl' : 'max-w-md'}`}
         onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-navy-700">
           <div className="flex items-center gap-2">
+            {paso === 'preview' && (
+              <button onClick={volverAConfig} className="btn-ghost p-1 rounded-lg mr-1"><ArrowLeft size={16} /></button>
+            )}
             <FileText size={17} className="text-cyan-400" />
-            <h3 className="text-white font-semibold text-sm">Generar planilla de singladuras</h3>
+            <h3 className="text-white font-semibold text-sm">
+              {paso === 'preview' ? 'Vista previa de la planilla' : 'Generar planilla de singladuras'}
+            </h3>
           </div>
           <button onClick={onCerrar} className="btn-ghost p-1.5 rounded-lg"><X size={16} /></button>
         </div>
 
-        <div className="overflow-y-auto px-5 py-4 space-y-4">
-          {/* Datos del período */}
-          <div className="bg-navy-900 rounded-xl p-3 border border-navy-700">
-            <div className="flex items-center gap-2 mb-1.5">
-              <Ship size={14} className="text-cyan-400" />
-              <span className="text-sm font-bold text-white">{periodo.barco || '(sin nombre)'}</span>
-            </div>
-            <p className="text-xs text-slate-400">
-              {fmtFecha(periodo.fechaEmbarco)} → {fmtFecha(periodo.fechaDesembarco)} · {periodo.viajes.length} viaje{periodo.viajes.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-
-          {/* Errores de validación */}
-          {!validacion.ok && (
-            <div className="bg-yellow-900/20 border border-yellow-800/30 rounded-xl p-3 space-y-1">
-              {validacion.errores.map((e, i) => (
-                <p key={i} className="text-xs text-yellow-400 flex items-start gap-1.5">
-                  <AlertCircle size={13} className="flex-shrink-0 mt-0.5" /> {e}
-                </p>
-              ))}
-            </div>
-          )}
-
-          {/* Selector de modo */}
-          {validacion.ok && (
-            <>
-              <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold mb-2">Columna de cómputo</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { id: 'singladuras', label: 'Singladuras', sub: 'Suma por viajes' },
-                    { id: 'dias', label: 'Días embarcado', sub: 'Período completo' },
-                  ].map(op => (
-                    <button key={op.id} onClick={() => setModo(op.id)}
-                      className={`text-left px-3 py-2.5 rounded-xl border transition-all ${
-                        modo === op.id
-                          ? 'bg-cyan-500/15 border-cyan-500/50'
-                          : 'bg-navy-900 border-navy-700 hover:border-navy-600'
-                      }`}>
-                      <p className={`text-sm font-semibold ${modo === op.id ? 'text-cyan-400' : 'text-slate-300'}`}>{op.label}</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">{op.sub}</p>
-                    </button>
-                  ))}
+        {/* ===== PASO CONFIG ===== */}
+        {paso === 'config' && (
+          <>
+            <div className="overflow-y-auto px-5 py-4 space-y-4">
+              {/* Datos del período */}
+              <div className="bg-navy-900 rounded-xl p-3 border border-navy-700">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Ship size={14} className="text-cyan-400" />
+                  <span className="text-sm font-bold text-white">{periodo.barco || '(sin nombre)'}</span>
                 </div>
+                <p className="text-xs text-slate-400">
+                  {fmtFecha(periodo.fechaEmbarco)} → {fmtFecha(periodo.fechaDesembarco)} · {periodo.viajes.length} viaje{periodo.viajes.length !== 1 ? 's' : ''}
+                </p>
               </div>
 
-              {/* Preview de viajes */}
-              <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold mb-2">
-                  Viajes incluidos ({periodo.viajes.length})
-                </p>
-                <div className="border border-navy-700 rounded-xl divide-y divide-navy-700 max-h-48 overflow-y-auto">
-                  {periodo.viajes.map((v, i) => (
-                    <div key={v.id || i} className="flex items-center justify-between px-3 py-2 text-xs">
-                      <span className="text-slate-300">
-                        {fmtFecha(v.fechaSalida)} → {fmtFecha(v.fechaRegreso)}
-                      </span>
-                      <span className="text-slate-500 truncate max-w-[120px]">
-                        {[v.puertoPartida, v.puertoLlegada].filter(Boolean).join(' → ') || '—'}
-                      </span>
+              {/* Errores de validación */}
+              {!validacion.ok && (
+                <div className="bg-yellow-900/20 border border-yellow-800/30 rounded-xl p-3 space-y-1">
+                  {validacion.errores.map((e, i) => (
+                    <p key={i} className="text-xs text-yellow-400 flex items-start gap-1.5">
+                      <AlertCircle size={13} className="flex-shrink-0 mt-0.5" /> {e}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              {/* Selector de modo */}
+              {validacion.ok && (
+                <>
+                  <div>
+                    <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold mb-2">Columna de cómputo</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: 'singladuras', label: 'Singladuras', sub: 'Suma por viajes' },
+                        { id: 'dias', label: 'Días embarcado', sub: 'Período completo' },
+                      ].map(op => (
+                        <button key={op.id} onClick={() => setModo(op.id)}
+                          className={`text-left px-3 py-2.5 rounded-xl border transition-all ${
+                            modo === op.id
+                              ? 'bg-cyan-500/15 border-cyan-500/50'
+                              : 'bg-navy-900 border-navy-700 hover:border-navy-600'
+                          }`}>
+                          <p className={`text-sm font-semibold ${modo === op.id ? 'text-cyan-400' : 'text-slate-300'}`}>{op.label}</p>
+                          <p className="text-[10px] text-slate-500 mt-0.5">{op.sub}</p>
+                        </button>
+                      ))}
                     </div>
-                  ))}
-                </div>
-                <div className="flex justify-between items-center mt-2 px-1">
-                  <span className="text-xs text-slate-500">TOTAL {modo === 'dias' ? 'días embarcado' : 'singladuras'}</span>
-                  <span className="text-lg font-bold text-cyan-400">{total}</span>
-                </div>
-              </div>
-            </>
-          )}
+                  </div>
 
-          {/* Mensaje de resultado */}
-          {mensaje && (
-            <div className={`rounded-xl p-3 text-xs flex items-start gap-2 ${
-              estado === 'error' ? 'bg-red-900/20 border border-red-800/30 text-red-400'
-                                 : 'bg-green-900/20 border border-green-800/30 text-green-400'
-            }`}>
-              {estado === 'error' ? <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
-                                  : <CheckCircle size={14} className="flex-shrink-0 mt-0.5" />}
-              <span>{mensaje}</span>
+                  {/* Lista de viajes */}
+                  <div>
+                    <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold mb-2">
+                      Viajes incluidos ({periodo.viajes.length})
+                    </p>
+                    <div className="border border-navy-700 rounded-xl divide-y divide-navy-700 max-h-48 overflow-y-auto">
+                      {periodo.viajes.map((v, i) => (
+                        <div key={v.id || i} className="flex items-center justify-between px-3 py-2 text-xs">
+                          <span className="text-slate-300">
+                            {fmtFecha(v.fechaSalida)} → {fmtFecha(v.fechaRegreso)}
+                          </span>
+                          <span className="text-slate-500 truncate max-w-[120px]">
+                            {[v.puertoPartida, v.puertoLlegada].filter(Boolean).join(' → ') || '—'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex justify-between items-center mt-2 px-1">
+                      <span className="text-xs text-slate-500">TOTAL {modo === 'dias' ? 'días embarcado' : 'singladuras'}</span>
+                      <span className="text-lg font-bold text-cyan-400">{total}</span>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {estado === 'error' && mensaje && (
+                <div className="rounded-xl p-3 text-xs flex items-start gap-2 bg-red-900/20 border border-red-800/30 text-red-400">
+                  <AlertCircle size={14} className="flex-shrink-0 mt-0.5" /><span>{mensaje}</span>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* Footer */}
-        <div className="px-5 py-4 border-t border-navy-700">
-          <button onClick={() => generar(false)} disabled={!validacion.ok || estado === 'generando'}
-            className="btn-primary w-full flex items-center justify-center gap-2 py-2.5 disabled:opacity-40">
-            {estado === 'generando'
-              ? <><Loader size={15} className="animate-spin" /> Generando...</>
-              : <><Download size={15} /> Generar y descargar PDF</>}
-          </button>
-          {validacion.ok && (
-            <button onClick={() => generar(true)} disabled={estado === 'generando'}
-              className="w-full text-center text-[11px] text-slate-600 hover:text-cyan-400 transition-colors mt-2">
-              Descargar grilla de calibración (ajuste de coordenadas)
-            </button>
-          )}
-        </div>
+            <div className="px-5 py-4 border-t border-navy-700">
+              <button onClick={() => generar(false)} disabled={!validacion.ok || estado === 'generando'}
+                className="btn-primary w-full flex items-center justify-center gap-2 py-2.5 disabled:opacity-40">
+                {estado === 'generando'
+                  ? <><Loader size={15} className="animate-spin" /> Generando...</>
+                  : <><FileText size={15} /> Ver vista previa</>}
+              </button>
+              {validacion.ok && (
+                <button onClick={() => generar(true)} disabled={estado === 'generando'}
+                  className="w-full text-center text-[11px] text-slate-600 hover:text-cyan-400 transition-colors mt-2">
+                  Generar grilla de calibración (ajuste de coordenadas)
+                </button>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ===== PASO PREVIEW ===== */}
+        {paso === 'preview' && pdf && (
+          <>
+            <div className="flex-1 overflow-hidden px-5 py-4 flex flex-col gap-3 min-h-0">
+              {!pdf.overlay && (
+                <div className="rounded-lg px-3 py-2 text-[11px] bg-yellow-900/20 border border-yellow-800/30 text-yellow-400">
+                  Layout preliminar — falta la plantilla oficial en public/planilla-refocapemm.pdf
+                </div>
+              )}
+              {pdf.debugGrid && (
+                <div className="rounded-lg px-3 py-2 text-[11px] bg-cyan-900/20 border border-cyan-800/30 text-cyan-400">
+                  Grilla de calibración: cada línea son coordenadas (x,y) para ajustar COORDS.
+                </div>
+              )}
+              <iframe
+                title="Vista previa planilla"
+                src={pdf.url}
+                className="w-full flex-1 rounded-lg border border-navy-600 bg-white"
+                style={{ minHeight: '55vh' }}
+              />
+              {mensaje && (
+                <div className="rounded-xl p-2.5 text-xs flex items-start gap-2 bg-green-900/20 border border-green-800/30 text-green-400">
+                  <CheckCircle size={14} className="flex-shrink-0 mt-0.5" /><span>{mensaje}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="px-5 py-4 border-t border-navy-700 flex gap-2">
+              <button onClick={handleDescargar}
+                className="btn-primary flex-1 flex items-center justify-center gap-2 py-2.5">
+                <Download size={15} /> Descargar
+              </button>
+              {puedeCompartir && (
+                <button onClick={handleCompartir}
+                  className="btn-ghost flex items-center justify-center gap-2 py-2.5 px-4 border border-navy-600 rounded-lg">
+                  <Share2 size={15} /> Compartir
+                </button>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
