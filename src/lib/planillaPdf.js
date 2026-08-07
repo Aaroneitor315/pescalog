@@ -33,18 +33,18 @@ export const COORDS = {
   pagina: { width: 612, height: 1008 },
 
   // Cabecera — tripulante (y medido desde abajo)
-  apellidoNombres: { x: 200, y: 905, size: 10 },
+  apellidoNombres: { x: 200, y: 914, size: 10 },
   documento:       { x: 25,  y: 884, size: 9 },
   titulo:          { x: 185, y: 884, size: 9 },
-  nroTitulo:       { x: 458, y: 884, size: 9 },
-  nroLibreta:      { x: 545, y: 884, size: 9 },
+  nroTitulo:       { x: 446, y: 884, size: 9 },
+  nroLibreta:      { x: 524, y: 884, size: 9 },
 
   // Bloque derecho — período de embarco (fechas en partes)
   periodo: {
     puertoSalida:    { x: 415, y: 787, size: 8 },
-    fechaSalida:     { x: 495, y: 787, size: 8, sep: 15 },
+    fechaSalida:     { x: 486, y: 787, size: 8, sep: 15 },
     puertoLlegada:   { x: 415, y: 737, size: 8 },
-    fechaLlegada:    { x: 495, y: 737, size: 8, sep: 15 },
+    fechaLlegada:    { x: 486, y: 737, size: 8, sep: 15 },
     buqueNombre:     { x: 410, y: 695, size: 8 },
     potenciaKW:      { x: 548, y: 668, size: 8 },
     empleoABordo:    { x: 410, y: 632, size: 8 },
@@ -52,13 +52,15 @@ export const COORDS = {
 
   // Tabla central — viajes. Primer renglón en yInicial, bajando altoFila.
   // 31 renglones "/ /", paso ~14.4 pt (medido con la grilla de calibración).
+  // Columna de fecha alineada al slot "/ /": salida-puerto→salida-fecha = 82 pt,
+  // misma distancia para llegada-puerto→llegada-fecha.
   filas: {
     yInicial: 804,
     altoFila: 14.4,
     puertoSalida: { x: 18,  size: 7 },
-    fechaSalida:  { x: 100, size: 7, sep: 15 },
+    fechaSalida:  { x: 98,  size: 7, sep: 15 },
     puertoLlegada:{ x: 172, size: 7 },
-    fechaLlegada: { x: 296, size: 7, sep: 15 },
+    fechaLlegada: { x: 254, size: 7, sep: 15 },
     marRio:       { x: 382, size: 7 },
     computo:      { x: 445, size: 7 },
   },
