@@ -42,9 +42,9 @@ export const COORDS = {
   // Bloque derecho — período de embarco (fechas en partes)
   periodo: {
     puertoSalida:    { x: 415, y: 787, size: 8 },
-    fechaSalida:     { x: 508, y: 787, size: 8, sep: 16 },
+    fechaSalida:     { x: 495, y: 787, size: 8, sep: 15 },
     puertoLlegada:   { x: 415, y: 737, size: 8 },
-    fechaLlegada:    { x: 508, y: 737, size: 8, sep: 16 },
+    fechaLlegada:    { x: 495, y: 737, size: 8, sep: 15 },
     buqueNombre:     { x: 410, y: 695, size: 8 },
     potenciaKW:      { x: 548, y: 668, size: 8 },
     empleoABordo:    { x: 410, y: 632, size: 8 },
@@ -55,12 +55,12 @@ export const COORDS = {
   filas: {
     yInicial: 804,
     altoFila: 14.4,
-    puertoSalida: { x: 20,  size: 7 },
-    fechaSalida:  { x: 108, size: 7, sep: 16 },
-    puertoLlegada:{ x: 180, size: 7 },
-    fechaLlegada: { x: 308, size: 7, sep: 16 },
-    marRio:       { x: 388, size: 7 },
-    computo:      { x: 448, size: 7 },
+    puertoSalida: { x: 18,  size: 7 },
+    fechaSalida:  { x: 100, size: 7, sep: 15 },
+    puertoLlegada:{ x: 172, size: 7 },
+    fechaLlegada: { x: 296, size: 7, sep: 15 },
+    marRio:       { x: 382, size: 7 },
+    computo:      { x: 445, size: 7 },
   },
 
   // Total (última hoja) — fila TOTAL al pie de la tabla
