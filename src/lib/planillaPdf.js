@@ -42,9 +42,9 @@ export const COORDS = {
   // Bloque derecho — período de embarco (fechas en partes)
   periodo: {
     puertoSalida:    { x: 415, y: 787, size: 8 },
-    fechaSalida:     { x: 506, y: 787, size: 8, sep: 14 },
+    fechaSalida:     { x: 505, y: 787, size: 8, sep1: 13, sep2: 17 },
     puertoLlegada:   { x: 415, y: 737, size: 8 },
-    fechaLlegada:    { x: 506, y: 737, size: 8, sep: 14 },
+    fechaLlegada:    { x: 505, y: 737, size: 8, sep1: 13, sep2: 17 },
     buqueNombre:     { x: 410, y: 695, size: 8 },
     potenciaKW:      { x: 548, y: 668, size: 8 },
     empleoABordo:    { x: 410, y: 632, size: 8 },
@@ -58,9 +58,9 @@ export const COORDS = {
     yInicial: 804,
     altoFila: 14.4,
     puertoSalida: { x: 18,  size: 7 },
-    fechaSalida:  { x: 98,  size: 7, sep: 15 },
+    fechaSalida:  { x: 104, size: 7, sep1: 19, sep2: 20 },
     puertoLlegada:{ x: 172, size: 7 },
-    fechaLlegada: { x: 254, size: 7, sep: 15 },
+    fechaLlegada: { x: 254, size: 7, sep1: 21, sep2: 22 },
     marRio:       { x: 320, size: 7 }, // se completa a mano; sin valor no se dibuja
     computo:      { x: 370, size: 7 },
   },
@@ -159,14 +159,17 @@ function estamparGrid(page, font) {
 }
 
 // Escribe una fecha en partes (dd, mm, aaaa) sobre los slots pre-impresos.
+// `sep1` = distancia día→mes, `sep2` = distancia mes→año (el año necesita más
+// espacio por ser de 4 dígitos). `sep` sigue funcionando como valor único.
 function escribirFechaPartes(page, font, cfg, iso) {
   const p = fmtFechaPartes(iso)
   if (!p || !cfg) return
   const opt = { size: cfg.size || 8, font, color: rgb(0, 0, 0) }
-  const sep = cfg.sep || 14
-  page.drawText(p.dd,   { x: cfg.x,           y: cfg.y, ...opt })
-  page.drawText(p.mm,   { x: cfg.x + sep,     y: cfg.y, ...opt })
-  page.drawText(p.aaaa, { x: cfg.x + sep * 2, y: cfg.y, ...opt })
+  const sep1 = cfg.sep1 ?? cfg.sep ?? 14
+  const sep2 = cfg.sep2 ?? cfg.sep ?? 14
+  page.drawText(p.dd,   { x: cfg.x,               y: cfg.y, ...opt })
+  page.drawText(p.mm,   { x: cfg.x + sep1,        y: cfg.y, ...opt })
+  page.drawText(p.aaaa, { x: cfg.x + sep1 + sep2, y: cfg.y, ...opt })
 }
 
 // Escribe el texto de una hoja sobre una página de la plantilla (overlay).
