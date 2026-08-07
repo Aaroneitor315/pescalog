@@ -33,18 +33,18 @@ export const COORDS = {
   pagina: { width: 612, height: 1008 },
 
   // Cabecera — tripulante (y medido desde abajo)
-  apellidoNombres: { x: 200, y: 914, size: 10 },
-  documento:       { x: 25,  y: 884, size: 9 },
-  titulo:          { x: 185, y: 884, size: 9 },
-  nroTitulo:       { x: 446, y: 884, size: 9 },
-  nroLibreta:      { x: 524, y: 884, size: 9 },
+  apellidoNombres: { x: 200, y: 920, size: 10 },
+  documento:       { x: 25,  y: 888, size: 9 },
+  titulo:          { x: 185, y: 888, size: 9 },
+  nroTitulo:       { x: 470, y: 888, size: 9 },
+  nroLibreta:      { x: 542, y: 888, size: 9 },
 
   // Bloque derecho — período de embarco (fechas en partes)
   periodo: {
     puertoSalida:    { x: 415, y: 787, size: 8 },
-    fechaSalida:     { x: 486, y: 787, size: 8, sep: 15 },
+    fechaSalida:     { x: 506, y: 787, size: 8, sep: 14 },
     puertoLlegada:   { x: 415, y: 737, size: 8 },
-    fechaLlegada:    { x: 486, y: 737, size: 8, sep: 15 },
+    fechaLlegada:    { x: 506, y: 737, size: 8, sep: 14 },
     buqueNombre:     { x: 410, y: 695, size: 8 },
     potenciaKW:      { x: 548, y: 668, size: 8 },
     empleoABordo:    { x: 410, y: 632, size: 8 },
@@ -61,8 +61,8 @@ export const COORDS = {
     fechaSalida:  { x: 98,  size: 7, sep: 15 },
     puertoLlegada:{ x: 172, size: 7 },
     fechaLlegada: { x: 254, size: 7, sep: 15 },
-    marRio:       { x: 382, size: 7 },
-    computo:      { x: 445, size: 7 },
+    marRio:       { x: 320, size: 7 }, // se completa a mano; sin valor no se dibuja
+    computo:      { x: 370, size: 7 },
   },
 
   // Total (última hoja) — fila TOTAL al pie de la tabla
@@ -94,7 +94,7 @@ export function construirDatosPlanilla({ periodo, libreta, perfil, fichaMotor, m
     fechaSalida: v.fechaSalida || '',
     puertoLlegada: v.puertoLlegada || '',
     fechaLlegada: v.fechaRegreso || '',
-    marRio: 'Mar', // pesca de altura ⇒ Mar por defecto (campo no modelado)
+    marRio: '', // Mar/Río se completa a mano (queda en blanco en el PDF)
     computo: modo === 'dias' ? '' : String(calcularSingladuras(v.fechaSalida, v.fechaRegreso)),
   }))
 
