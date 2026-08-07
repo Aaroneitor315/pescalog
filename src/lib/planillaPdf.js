@@ -36,8 +36,8 @@ export const COORDS = {
   apellidoNombres: { x: 200, y: 920, size: 10 },
   documento:       { x: 25,  y: 888, size: 9 },
   titulo:          { x: 185, y: 888, size: 9 },
-  nroTitulo:       { x: 470, y: 888, size: 9 },
-  nroLibreta:      { x: 542, y: 888, size: 9 },
+  nroTitulo:       { x: 470, y: 888, size: 9 }, // sin autorrelleno (a mano); se deja por si se reactiva
+  nroLibreta:      { x: 537, y: 888, size: 9 }, // Nº libreta: 6 dígitos, centrado-izquierda en su columna
 
   // Bloque derecho — período de embarco (fechas en partes)
   periodo: {
@@ -86,7 +86,6 @@ function fmtFechaPartes(iso) {
 // Arma el modelo de datos que consume el PDF a partir de las fuentes de la app.
 // `modo` = 'singladuras' | 'dias'. Sólo cambia la columna de cómputo y el TOTAL.
 export function construirDatosPlanilla({ periodo, libreta, perfil, fichaMotor, modo = 'singladuras' }) {
-  const docTitulo = (libreta?.documentos || []).find(d => /t[íi]tulo/i.test(d.nombre || ''))
   const potenciaKW = fichaMotor?.motorPrincipal?.potenciaKW || ''
 
   const filas = periodo.viajes.map(v => ({
@@ -105,7 +104,7 @@ export function construirDatosPlanilla({ periodo, libreta, perfil, fichaMotor, m
     apellidoNombres: libreta?.nombre || '',
     documento: libreta?.dni || '',
     titulo: '',                         // no modelado → en blanco (proxy: perfil.rango)
-    nroTitulo: docTitulo?.numero || '',
+    nroTitulo: '',                      // Nº de título se completa a mano
     nroLibreta: libreta?.nroLibreta || '',
     // Bloque derecho (período)
     periodoFechaSalida: periodo.fechaEmbarco || '',
