@@ -60,7 +60,7 @@ export const COORDS = {
     puertoSalida: { x: 18,  size: 7 },
     fechaSalida:  { x: 104, size: 7, sep1: 19, sep2: 20 },
     puertoLlegada:{ x: 172, size: 7 },
-    fechaLlegada: { x: 254, size: 7, sep1: 21, sep2: 22 },
+    fechaLlegada: { x: 244, size: 7, sep1: 19, sep2: 20 },
     marRio:       { x: 320, size: 7 }, // se completa a mano; sin valor no se dibuja
     computo:      { x: 370, size: 7 },
   },
