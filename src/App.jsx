@@ -8,6 +8,7 @@ import Libreta from './components/Libreta'
 import Login from './components/Login'
 import AdminPanel from './components/AdminPanel'
 import Calculadora from './components/Calculadora'
+import MisEmbarcos from './components/MisEmbarcos'
 import PanelMaquinista from './components/PanelMaquinista'
 import NetworkBanner from './components/NetworkBanner'
 import Onboarding from './components/Onboarding'
@@ -153,6 +154,7 @@ export default function App() {
           />
         )}
         {tab === 'liquidacion' && <Calculadora uid={uid} />}
+        {tab === 'embarcos' && <MisEmbarcos uid={uid} viajes={viajes} libreta={libreta} perfil={perfil} />}
         {tab === 'admin' && <AdminPanel />}
       </main>
     </div>

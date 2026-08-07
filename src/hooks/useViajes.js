@@ -4,13 +4,10 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase'
 
-export function calcularSingladuras(fechaSalida, fechaRegreso) {
-  if (!fechaSalida || !fechaRegreso) return 0
-  const a = new Date(fechaSalida)
-  const b = new Date(fechaRegreso)
-  const diff = Math.round((b - a) / (1000 * 60 * 60 * 24))
-  return diff > 0 ? diff : 0
-}
+// El cómputo vive en un único módulo (src/lib/singladuras.js) para que el
+// dashboard, el formulario y la planilla REFOCAPEMM usen exactamente la misma
+// fórmula. Se re-exporta acá por compatibilidad con los imports existentes.
+export { calcularSingladuras } from '../lib/singladuras'
 
 async function actualizarStats(especie, cajones, operacion) {
   if (!especie || !cajones) return

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LogOut, Shield, BarChart2, List, Plus, BookOpen, MoreHorizontal, DollarSign, Calculator, X } from 'lucide-react'
+import { LogOut, Shield, BarChart2, List, Plus, BookOpen, MoreHorizontal, DollarSign, Calculator, Anchor, X } from 'lucide-react'
 import { esAdmin } from '../hooks/useAdmin'
 import { SECTORES } from '../hooks/usePerfil'
 
@@ -10,6 +10,7 @@ const TABS_DESKTOP = [
   { id: 'precios', label: 'Valores' },
   { id: 'nuevo', label: '+ Nuevo viaje' },
   { id: 'liquidacion', label: 'Calculadora' },
+  { id: 'embarcos', label: 'Mis embarcos' },
 ]
 
 const TABS_BOTTOM = [
@@ -24,6 +25,7 @@ const TABS_MAS = [
   { id: 'nuevo', label: '+ Nuevo viaje', icon: Plus },
   { id: 'precios', label: 'Valores', icon: DollarSign },
   { id: 'liquidacion', label: 'Calculadora', icon: Calculator },
+  { id: 'embarcos', label: 'Mis embarcos', icon: Anchor },
 ]
 
 export default function Navbar({ tab, setTab, user, onCerrarSesion, perfil, alertasLibreta = 0 }) {
@@ -35,7 +37,7 @@ export default function Navbar({ tab, setTab, user, onCerrarSesion, perfil, aler
     setMasAbierto(false)
   }
 
-  const enMas = ['precios', 'liquidacion', 'admin'].includes(tab)
+  const enMas = ['precios', 'liquidacion', 'embarcos', 'admin'].includes(tab)
 
   return (
     <>
