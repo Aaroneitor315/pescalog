@@ -24,7 +24,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { calcularSingladuras } from './singladuras.js'
 
 const URL_PLANTILLA = '/planilla-refocapemm.pdf'
-const FILAS_POR_HOJA = 31 // filas de viaje que entran en la tabla oficial
+const FILAS_POR_HOJA = 31 // renglones "/ /" de la tabla oficial (medido en grilla)
 
 // ─── Coordenadas de overlay ─────────────────────────────────────────────────
 // pdf-lib usa origen ABAJO-IZQUIERDA, unidad = punto (1/72"). Página oficio.
@@ -33,40 +33,38 @@ export const COORDS = {
   pagina: { width: 612, height: 1008 },
 
   // Cabecera — tripulante (y medido desde abajo)
-  apellidoNombres: { x: 200, y: 910, size: 10 },
-  documento:       { x: 28,  y: 872, size: 9 },
-  titulo:          { x: 210, y: 872, size: 9 },
-  nroTitulo:       { x: 470, y: 872, size: 9 },
-  nroLibreta:      { x: 545, y: 872, size: 9 },
+  apellidoNombres: { x: 200, y: 905, size: 10 },
+  documento:       { x: 25,  y: 884, size: 9 },
+  titulo:          { x: 185, y: 884, size: 9 },
+  nroTitulo:       { x: 458, y: 884, size: 9 },
+  nroLibreta:      { x: 545, y: 884, size: 9 },
 
   // Bloque derecho — período de embarco (fechas en partes)
   periodo: {
-    puertoSalida:    { x: 470, y: 745, size: 8 },
-    fechaSalida:     { x: 545, y: 745, size: 8, sep: 16 },
-    puertoLlegada:   { x: 470, y: 695, size: 8 },
-    fechaLlegada:    { x: 545, y: 695, size: 8, sep: 16 },
-    buqueNombre:     { x: 475, y: 652, size: 8 },
-    potenciaKW:      { x: 560, y: 620, size: 8 },
-    empleoABordo:    { x: 490, y: 588, size: 8 },
+    puertoSalida:    { x: 415, y: 787, size: 8 },
+    fechaSalida:     { x: 508, y: 787, size: 8, sep: 16 },
+    puertoLlegada:   { x: 415, y: 737, size: 8 },
+    fechaLlegada:    { x: 508, y: 737, size: 8, sep: 16 },
+    buqueNombre:     { x: 410, y: 695, size: 8 },
+    potenciaKW:      { x: 548, y: 668, size: 8 },
+    empleoABordo:    { x: 410, y: 632, size: 8 },
   },
 
   // Tabla central — viajes. Primer renglón en yInicial, bajando altoFila.
+  // 31 renglones "/ /", paso ~14.4 pt (medido con la grilla de calibración).
   filas: {
-    yInicial: 742,
-    altoFila: 23.4,
-    puertoSalida: { x: 22,  size: 8 },
-    fechaSalida:  { x: 118, size: 8, sep: 14 },
-    puertoLlegada:{ x: 210, size: 8 },
-    fechaLlegada: { x: 320, size: 8, sep: 14 },
-    marRio:       { x: 405, size: 8 },
-    computo:      { x: 452, size: 8 },
+    yInicial: 804,
+    altoFila: 14.4,
+    puertoSalida: { x: 20,  size: 7 },
+    fechaSalida:  { x: 108, size: 7, sep: 16 },
+    puertoLlegada:{ x: 180, size: 7 },
+    fechaLlegada: { x: 308, size: 7, sep: 16 },
+    marRio:       { x: 388, size: 7 },
+    computo:      { x: 448, size: 7 },
   },
 
   // Total (última hoja) — fila TOTAL al pie de la tabla
-  total: { x: 452, y: 70, size: 10 },
-
-  // Etiqueta de modo sobre el encabezado de la columna de cómputo
-  encabezadoComputo: { x: 430, y: 760, size: 7 },
+  total: { x: 448, y: 350, size: 10 },
 }
 
 // 'YYYY-MM-DD' → 'DD/MM/AAAA' (para el fallback).
