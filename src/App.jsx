@@ -153,7 +153,15 @@ export default function App() {
             viajes={viajes}
           />
         )}
-        {tab === 'liquidacion' && <Calculadora uid={uid} />}
+        {tab === 'liquidacion' && (
+          <Calculadora
+            uid={uid}
+            viajes={viajes}
+            libreta={libreta}
+            perfil={perfil}
+            esAdmin={user?.email === 'alangambacorta7@gmail.com'}
+          />
+        )}
         {tab === 'embarcos' && <MisEmbarcos uid={uid} viajes={viajes} libreta={libreta} perfil={perfil} />}
         {tab === 'admin' && <AdminPanel />}
       </main>
