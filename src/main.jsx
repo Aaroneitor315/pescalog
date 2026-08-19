@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import ActualizacionPWA from './components/ActualizacionPWA'
+import InstalarIOS from './components/InstalarIOS'
 import './index.css'
 
 class ErrorBoundary extends React.Component {
@@ -50,6 +51,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <ErrorBoundary>
       <App />
       <ActualizacionPWA />
+      <InstalarIOS />
     </ErrorBoundary>
   </React.StrictMode>
 )
