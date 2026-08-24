@@ -59,8 +59,14 @@ export function useAuth() {
       await sendPasswordResetEmail(auth, email)
       return true
     } catch (e) {
-      setError(traducirError(e.code))
-      return false
+      // Seguridad: no revelamos si el email existe. Ante cualquier error
+      // (p. ej. user-not-found) devolvemos éxito igual; solo diferenciamos
+      // el formato de email inválido.
+      if (e.code === 'auth/invalid-email') {
+        setError('El email no es válido.')
+        return false
+      }
+      return true
     }
   }
 

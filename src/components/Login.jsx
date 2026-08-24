@@ -79,7 +79,7 @@ export default function Login() {
                   <div className="text-green-400 text-3xl mb-3">✓</div>
                   <p className="text-white font-medium mb-1">Email enviado</p>
                   <p className="text-slate-400 text-sm">
-                    Revisá tu casilla <span className="text-cyan-400">{email}</span> y seguí el enlace para restablecer tu contraseña.
+                    Te enviamos un email para restablecer tu contraseña. Revisá tu bandeja de entrada (y la carpeta de spam).
                   </p>
                   <button
                     onClick={() => { setModo('login'); setResetEnviado(false) }}
