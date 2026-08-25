@@ -1,42 +1,43 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Camera, Plus, Minus, Trash2, FileText, Wrench, Anchor, Loader, Pencil, Save, ChevronDown, ChevronUp } from 'lucide-react'
+import { X, Camera, Plus, Minus, Trash2, Wrench, Anchor, Loader, Pencil, Save, Search, AlertTriangle, Check, Copy, MessageCircle } from 'lucide-react'
 import { createWorker } from 'tesseract.js'
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import { getDoc, setDoc, doc } from 'firebase/firestore'
 import { storage, db } from '../firebase'
 import { useRepuestos } from '../hooks/useRepuestos'
+import StatusPill, { estadoStock, colorEstado } from './StatusPill'
 
+// Cada sección aporta su color de acento. Se expone como variables CSS
+// (--accent / --accent-soft / --accent-line) en la raíz del modal, así el resto
+// de la UI usa el mismo acento sin repetir clases por sección.
 const SECTORES = {
   maquinas: {
     label: 'Máquinas',
     sub: 'Sala de máquinas · repuestos y filtros',
     Icon: Wrench,
-    color: '#0891b2',
-    colorClass: 'text-cyan-400',
-    bg: 'bg-cyan-500/10',
-    border: 'border-cyan-500/30',
+    accent: '#22d3ee',                     // cyan
+    accentSoft: 'rgba(34,211,238,0.10)',
+    accentLine: 'rgba(34,211,238,0.30)',
   },
   cubierta: {
     label: 'Cubierta',
     sub: 'Cubierta · equipos y aparejos',
     Icon: Anchor,
-    color: '#10b981',
-    colorClass: 'text-emerald-400',
-    bg: 'bg-emerald-500/10',
-    border: 'border-emerald-500/30',
+    accent: '#34d399',                     // esmeralda
+    accentSoft: 'rgba(52,211,153,0.10)',
+    accentLine: 'rgba(52,211,153,0.30)',
   },
   puente: {
     label: 'Puente',
     sub: 'Puente de mando · instrumental y navegación',
-    Icon: ({ size, className }) => (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    Icon: ({ size, className, style }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>
         <path d="M2 20h20M5 20V10l7-7 7 7v10M9 20v-6h6v6"/>
       </svg>
     ),
-    color: '#a855f7',
-    colorClass: 'text-purple-400',
-    bg: 'bg-purple-500/10',
-    border: 'border-purple-500/30',
+    accent: '#a855f7',                     // violeta
+    accentSoft: 'rgba(168,85,247,0.10)',
+    accentLine: 'rgba(168,85,247,0.30)',
   },
 }
 
@@ -156,56 +157,180 @@ function extraerCodigo(texto) {
   return ''
 }
 
-function colorStock(qty, min) {
-  if (qty === 0) return { text: 'text-red-400', label: 'Pedir', bg: 'bg-red-500/10 border-red-500/30' }
-  if (qty <= min) return { text: 'text-yellow-400', label: '¡Bajo!', bg: 'bg-yellow-500/10 border-yellow-500/30' }
-  return { text: 'text-green-400', label: 'OK', bg: 'bg-green-500/10 border-green-500/30' }
+// Normaliza para búsqueda: minúsculas y sin acentos.
+const sinAcentos = (s) => (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+
+// Estado de una tarea de mantenimiento según horas actuales vs "próximo a".
+function estadoTarea(horas, proximo, cada) {
+  const p = Number(proximo) || 0
+  const h = Number(horas) || 0
+  if (!p) return { label: 'OK', color: '#34d399' }
+  if (h >= p) return { label: 'Vencido', color: '#f87171' }
+  const faltan = p - h
+  const umbral = Math.max(20, (Number(cada) || 0) * 0.15)
+  if (faltan <= umbral) return { label: `En ${faltan} hs`, color: '#fbbf24' }
+  return { label: 'OK', color: '#34d399' }
 }
 
-function exportarPDF(repuestos) {
-  const pedidos = repuestos.filter(r => r.stockActual <= r.stockMinimo)
-  const html = `
-    <html><head><meta charset="utf-8">
-    <title>Orden de compra — BitácoraAR</title>
-    <style>
-      body{font-family:Arial,sans-serif;padding:24px;color:#111;}
-      h1{font-size:18px;margin-bottom:4px;}
-      p.sub{color:#666;font-size:13px;margin-bottom:20px;}
-      table{width:100%;border-collapse:collapse;font-size:13px;}
-      th{background:#0a2540;color:#fff;padding:8px 10px;text-align:left;}
-      td{padding:8px 10px;border-bottom:1px solid #e5e7eb;}
-      img{width:48px;height:48px;object-fit:cover;border-radius:4px;}
-      .badge{display:inline-block;background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:4px;font-size:11px;}
-    </style></head><body>
-    <h1>Orden de compra</h1>
-    <p class="sub">BitácoraAR · ${new Date().toLocaleDateString('es-AR')} · ${pedidos.length} ítem${pedidos.length !== 1 ? 's' : ''}</p>
-    <table>
-      <thead><tr><th>Foto</th><th>Código</th><th>Descripción</th><th>Categoría</th><th>Stock actual</th><th>A pedir</th></tr></thead>
-      <tbody>
-        ${pedidos.map(r => `
-          <tr>
-            <td>${r.foto ? `<img src="${r.foto}">` : '—'}</td>
-            <td><strong>${r.codigo}</strong></td>
-            <td>${r.descripcion || '—'}</td>
-            <td>${r.categoria || '—'}</td>
-            <td><span class="badge">${r.stockActual} ud.</span></td>
-            <td><strong>${r.cantPedir || 1}</strong></td>
-          </tr>`).join('')}
-      </tbody>
-    </table>
-    </body></html>`
-  const w = window.open('', '_blank')
-  w.document.write(html)
-  w.document.close()
-  w.print()
+// Condición de un arte de pesca (equivalente al "estado" del stock).
+const CONDICIONES = {
+  ok:      { label: 'En condición', color: '#34d399' },
+  revisar: { label: 'A revisar',    color: '#fbbf24' },
+  fuera:   { label: 'Fuera de uso', color: '#f87171' },
+}
+const TIPOS_ARTE = ['Red', 'Puertas', 'Malleta', 'Cabo', 'Cable', 'Grillete', 'Boya', 'Otro']
+const ICONO_ARTE = { Red: '🕸️', Puertas: '🚪', Malleta: '🪢', Cabo: '🪢', Cable: '🔗', Grillete: '⛓️', Boya: '🟠', Otro: '⚓' }
+
+// Empty state de la vista Repuestos: guía para cargar el primero.
+function EmptyRepuestos({ seccionLabel, onFoto, onManual }) {
+  const pasos = [
+    { n: 1, t: 'Sacá la foto', d: 'Al repuesto o a su código.' },
+    { n: 2, t: 'Confirmá los datos', d: 'Código, marca, descripción y stock mínimo.' },
+    { n: 3, t: 'Queda en la planilla', d: 'Y salta la alerta cuando baja del mínimo.' },
+  ]
+  return (
+    <div className="px-6 py-10 flex flex-col items-center text-center">
+      <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
+        style={{ background: 'var(--accent-soft)', border: '1px solid var(--accent-line)' }}>
+        <Camera size={26} style={{ color: 'var(--accent)' }} />
+      </div>
+      <h3 className="text-white font-semibold text-base mb-1.5 text-balance">
+        Cargá el primer repuesto de {seccionLabel}
+      </h3>
+      <p className="text-slate-400 text-sm max-w-xs mb-5 leading-relaxed">
+        Sacale una foto al repuesto o a su código y lo sumamos a la planilla. La lista, el stock y las alertas se arman solos a medida que cargás.
+      </p>
+      <div className="flex flex-col sm:flex-row gap-2 w-full max-w-xs">
+        <button onClick={onFoto}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold"
+          style={{ background: 'var(--accent)', color: '#07131f' }}>
+          <Camera size={16} /> Fotografiar repuesto
+        </button>
+        <button onClick={onManual} className="flex-1 btn-ghost py-2.5 rounded-lg text-sm">
+          Cargar manualmente
+        </button>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-8 w-full max-w-lg">
+        {pasos.map(p => (
+          <div key={p.n} className="bg-navy-800 border border-navy-700 rounded-xl p-3">
+            <div className="w-7 h-7 rounded-full mx-auto mb-2 flex items-center justify-center text-xs font-bold"
+              style={{ background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent-line)' }}>
+              {p.n}
+            </div>
+            <p className="text-white text-xs font-semibold mb-0.5">{p.t}</p>
+            <p className="text-slate-500 text-[11px] leading-snug">{p.d}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Tiempo relativo corto para el footer ("hace 5 min", "hace 2 días").
+function haceCuanto(date) {
+  if (!date) return '—'
+  const seg = Math.floor((Date.now() - date.getTime()) / 1000)
+  if (seg < 60) return 'recién'
+  const min = Math.floor(seg / 60)
+  if (min < 60) return `hace ${min} min`
+  const h = Math.floor(min / 60)
+  if (h < 24) return `hace ${h} h`
+  const d = Math.floor(h / 24)
+  if (d < 30) return `hace ${d} día${d === 1 ? '' : 's'}`
+  const mes = Math.floor(d / 30)
+  return `hace ${mes} mes${mes === 1 ? '' : 'es'}`
+}
+
+// Fila de repuesto. Mismo componente y misma data; el layout cambia por CSS:
+// tarjeta vertical en mobile, fila horizontal en sm:. Hit targets ≥ 44px en mobile.
+function FilaRepuesto({ r, onDec, onInc, onEdit, confirmando, onAskDelete, onConfirmDelete, onCancelDelete }) {
+  const estado = estadoStock(r.stockActual, r.stockMinimo)
+
+  const thumbEl = (
+    <div className="w-[52px] h-[52px] rounded-lg bg-navy-700 border border-navy-600 flex-shrink-0 overflow-hidden">
+      {r.foto
+        ? <img src={r.foto} className="w-full h-full object-cover" />
+        : <div className="w-full h-full flex items-center justify-center text-slate-600 text-xl">🔧</div>}
+    </div>
+  )
+  const codigoMarca = (
+    <div className="flex items-center gap-2 min-w-0">
+      <span className="font-mono font-bold text-white text-sm truncate">{r.codigo}</span>
+      {r.marca && (
+        <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-navy-700 border border-navy-600 text-slate-400">{r.marca}</span>
+      )}
+    </div>
+  )
+  const descEl = (r.descripcion || r.categoria)
+    ? <p className="text-xs text-slate-500 truncate">{r.descripcion || r.categoria}</p>
+    : null
+  const stepperEl = (
+    <div className="inline-flex items-center rounded-lg border border-navy-600 overflow-hidden flex-shrink-0">
+      <button onClick={onDec} aria-label="Restar"
+        className="w-11 h-11 sm:w-8 sm:h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-navy-700 transition-colors"><Minus size={15} /></button>
+      <span className="w-10 sm:w-8 text-center text-sm font-bold tabular-nums" style={{ color: colorEstado(estado) }}>{r.stockActual}</span>
+      <button onClick={onInc} aria-label="Sumar"
+        className="w-11 h-11 sm:w-8 sm:h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-navy-700 transition-colors"><Plus size={15} /></button>
+    </div>
+  )
+  const minEl = <span className="text-[11px] text-slate-500 whitespace-nowrap">mínimo: {r.stockMinimo}</span>
+  const actionsEl = confirmando ? (
+    <div className="flex gap-1.5 flex-shrink-0">
+      <button onClick={onConfirmDelete} className="text-xs font-semibold bg-red-600 text-white px-3 h-11 sm:h-8 rounded-lg">Sí</button>
+      <button onClick={onCancelDelete} className="text-xs bg-navy-700 text-slate-400 px-3 h-11 sm:h-8 rounded-lg">No</button>
+    </div>
+  ) : (
+    <div className="flex items-center gap-1.5 flex-shrink-0">
+      <button onClick={onEdit} title="Editar" aria-label="Editar"
+        className="w-11 h-11 sm:w-8 sm:h-8 rounded-lg border border-navy-600 hover:border-navy-500 flex items-center justify-center transition-colors"><Pencil size={15} style={{ color: 'var(--accent)' }} /></button>
+      <button onClick={onAskDelete} title="Borrar" aria-label="Borrar"
+        className="w-11 h-11 sm:w-8 sm:h-8 rounded-lg border border-navy-600 hover:border-red-500/50 flex items-center justify-center transition-colors"><Trash2 size={15} className="text-red-400" /></button>
+    </div>
+  )
+
+  return (
+    <>
+      {/* Mobile: tarjeta vertical */}
+      <div className="sm:hidden flex flex-col gap-2.5 px-4 py-3 border-b border-navy-700/40">
+        <div className="flex items-center gap-3">
+          {thumbEl}
+          <div className="flex-1 min-w-0">{codigoMarca}</div>
+          <StatusPill status={estado} />
+        </div>
+        {descEl && <div className="pl-[64px] -mt-1">{descEl}</div>}
+        <div className="flex items-center gap-3">
+          {stepperEl}
+          {minEl}
+          <div className="ml-auto">{actionsEl}</div>
+        </div>
+      </div>
+
+      {/* sm+ : fila horizontal */}
+      <div className="hidden sm:flex items-center gap-3 px-4 py-3 border-b border-navy-700/40">
+        {thumbEl}
+        <div className="flex-1 min-w-0">{codigoMarca}{descEl}</div>
+        {stepperEl}
+        <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
+          <StatusPill status={estado} />
+          {minEl}
+        </div>
+        {actionsEl}
+      </div>
+    </>
+  )
 }
 
 export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar }) {
   const sector = SECTORES[seccion] || SECTORES.maquinas
   const { Icon } = sector
-  const { repuestos, cargando, agregar, editar, actualizarStock, actualizarCantPedir, eliminar } = useRepuestos(uid, seccion)
+  const { repuestos, cargando, agregar, editar, actualizarStock, eliminar } = useRepuestos(uid, seccion)
   const vistaInicial = 'stock'
   const [vista, setVista] = useState(vistaInicial)
+  const [busqueda, setBusqueda] = useState('')
+  const [filtroEstado, setFiltroEstado] = useState('todos') // todos | ok | low | out
+  const [pedidoCant, setPedidoCant] = useState({}) // cantidad a pedir por id (override del sugerido)
+  const [pedidoSel, setPedidoSel] = useState({})   // selección de ítems para la orden
+  const [copiado, setCopiado] = useState(false)
   const [ocr, setOcr] = useState({ activo: false, progreso: false, texto: '', codigo: '' })
   const CATEGORIAS = seccion === 'maquinas' ? CATEGORIAS_MAQUINAS : CATEGORIAS_CUBIERTA
   const catDefault = CATEGORIAS[0]
@@ -219,9 +344,13 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
 
   // Ficha técnica motor (solo maquinas)
   const fichaMotorVacia = {
-    motorPrincipal: { marca: '', modelo: '', potenciaHP: '', potenciaKW: '', cilindrada: '', rpmMax: '', nroSerie: '', año: '' },
+    motorPrincipal: { marca: '', modelo: '', potenciaHP: '', potenciaKW: '', cilindrada: '', rpmMax: '', nroSerie: '', año: '', combustible: '', reductor: '', relacion: '' },
     auxiliar1: { marca: '', modelo: '', potenciaHP: '', potenciaKW: '' },
     auxiliar2: { marca: '', modelo: '', potenciaHP: '', potenciaKW: '' },
+    horasMarcha: '',
+    intervaloAceite: '',   // hs entre services de aceite
+    horasUltimoAceite: '', // horas al último cambio de aceite
+    mantenimiento: [],     // [{ tarea, cada, proximo, codigo }]
   }
   const [fichaMotor, setFichaMotor] = useState(fichaMotorVacia)
   const [fichaMotorGuardando, setFichaMotorGuardando] = useState(false)
@@ -233,11 +362,15 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     portones: { peso: '', envergadura: '', tipo: '', angulo: '' },
     malletas: { longitud: '', diametro: '' },
     red: { aberturaH: '', aberturaV: '', mallasCuerpo: '', mallasSaco: '' },
+    items: [], // inventario de artes: { id, nombre, tipo, detalle, cantidad, unidad, condicion }
   }
   const [artes, setArtes] = useState(artesVacio)
-  const [artesGuardando, setArtesGuardando] = useState(false)
-  const [artesGuardado, setArtesGuardado] = useState(false)
-  const [artesExpandido, setArtesExpandido] = useState({ warps: true, portones: false, malletas: false, red: false })
+  const [busquedaArte, setBusquedaArte] = useState('')
+  const [filtroArte, setFiltroArte] = useState('todas') // todas | ok | revisar | fuera
+  const [modoArte, setModoArte] = useState(false)
+  const [editandoArteId, setEditandoArteId] = useState(null)
+  const arteVacio = { nombre: '', tipo: 'Red', detalle: '', cantidad: 1, unidad: 'u', condicion: 'ok' }
+  const [formArte, setFormArte] = useState(arteVacio)
 
   useEffect(() => {
     if (!uid) return
@@ -264,25 +397,48 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     }
   }
 
-  async function guardarArtes() {
-    setArtesGuardando(true)
-    try {
-      await setDoc(doc(db, 'usuarios', uid, 'fichas', 'artes_pesca'), artes, { merge: true })
-      setArtesGuardado(true)
-      setTimeout(() => setArtesGuardado(false), 2000)
-    } finally {
-      setArtesGuardando(false)
-    }
+  // Persiste la lista de artes (mismo doc, setDoc merge).
+  async function persistirArtes(next) {
+    setArtes(next)
+    try { await setDoc(doc(db, 'usuarios', uid, 'fichas', 'artes_pesca'), next, { merge: true }) } catch { /* offline */ }
+  }
+  function guardarArteItem() {
+    if (!formArte.nombre.trim()) return
+    const items = artes.items || []
+    const datos = { ...formArte, nombre: formArte.nombre.trim(), detalle: formArte.detalle.trim(), cantidad: Number(formArte.cantidad) || 0 }
+    const next = editandoArteId
+      ? { ...artes, items: items.map(a => a.id === editandoArteId ? { ...a, ...datos } : a) }
+      : { ...artes, items: [...items, { ...datos, id: Date.now().toString() }] }
+    persistirArtes(next)
+    setModoArte(false); setEditandoArteId(null); setFormArte(arteVacio)
+  }
+  function abrirEdicionArte(a) {
+    setEditandoArteId(a.id)
+    setFormArte({ nombre: a.nombre || '', tipo: a.tipo || 'Red', detalle: a.detalle || '', cantidad: a.cantidad ?? 1, unidad: a.unidad || 'u', condicion: a.condicion || 'ok' })
+    setModoArte(true)
+  }
+  function eliminarArteItem(id) {
+    persistirArtes({ ...artes, items: (artes.items || []).filter(a => a.id !== id) })
+    setModoArte(false); setEditandoArteId(null); setFormArte(arteVacio)
   }
 
 
   function setMotor(motor, campo, valor) {
     setFichaMotor(f => ({ ...f, [motor]: { ...f[motor], [campo]: valor } }))
   }
-
-  function setArte(arte, campo, valor) {
-    setArtes(a => ({ ...a, [arte]: { ...a[arte], [campo]: valor } }))
+  function setFicha(campo, valor) {
+    setFichaMotor(f => ({ ...f, [campo]: valor }))
   }
+  function setMant(i, campo, valor) {
+    setFichaMotor(f => ({ ...f, mantenimiento: (f.mantenimiento || []).map((t, j) => j === i ? { ...t, [campo]: valor } : t) }))
+  }
+  function addMant() {
+    setFichaMotor(f => ({ ...f, mantenimiento: [...(f.mantenimiento || []), { tarea: '', cada: '', proximo: '', codigo: '' }] }))
+  }
+  function delMant(i) {
+    setFichaMotor(f => ({ ...f, mantenimiento: (f.mantenimiento || []).filter((_, j) => j !== i) }))
+  }
+
 
   function abrirEdicion(r) {
     setEditandoId(r.id)
@@ -372,14 +528,127 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
 
   const pendientes = repuestos.filter(r => r.stockActual <= r.stockMinimo)
 
+  // Contadores por estado + unidades totales (para los chips).
+  const cuenta = { ok: 0, low: 0, out: 0 }
+  repuestos.forEach(r => { cuenta[estadoStock(r.stockActual, r.stockMinimo)]++ })
+  const unidadesTotales = repuestos.reduce((s, r) => s + r.stockActual, 0)
+
+  const chipsEstado = [
+    { id: 'todos', label: 'Todos', n: repuestos.length, dot: null },
+    { id: 'ok', label: 'En orden', n: cuenta.ok, dot: '#34d399' },
+    { id: 'low', label: 'Stock bajo', n: cuenta.low, dot: '#fbbf24' },
+    { id: 'out', label: 'Sin stock', n: cuenta.out, dot: '#f87171' },
+  ]
+
+  // Filtro en vivo: buscador (código/descr/marca, sin acentos) + chip de estado.
+  const q = sinAcentos(busqueda.trim())
+  const repuestosFiltrados = repuestos.filter(r => {
+    if (q && !sinAcentos(`${r.codigo} ${r.descripcion} ${r.marca}`).includes(q)) return false
+    if (filtroEstado !== 'todos' && estadoStock(r.stockActual, r.stockMinimo) !== filtroEstado) return false
+    return true
+  })
+
+  // Agrupación: "Requieren reposición" (Sin stock primero, luego Bajo) y "En orden".
+  const RANK = { out: 0, low: 1 }
+  const requieren = repuestosFiltrados
+    .filter(r => estadoStock(r.stockActual, r.stockMinimo) !== 'ok')
+    .sort((a, b) => RANK[estadoStock(a.stockActual, a.stockMinimo)] - RANK[estadoStock(b.stockActual, b.stockMinimo)])
+  const enOrden = repuestosFiltrados.filter(r => estadoStock(r.stockActual, r.stockMinimo) === 'ok')
+
+  // Última actualización (más reciente entre todos los repuestos).
+  const ultimaAct = repuestos
+    .map(r => r.actualizadoEn?.toDate?.())
+    .filter(Boolean)
+    .reduce((max, d) => (!max || d > max ? d : max), null)
+
+  // Handlers de fila (comunes a los dos grupos).
+  const filaProps = (r) => ({
+    onDec: () => actualizarStock(r.id, Math.max(0, r.stockActual - 1)),
+    onInc: () => actualizarStock(r.id, r.stockActual + 1),
+    onEdit: () => abrirEdicion(r),
+    confirmando: confirmarId === r.id,
+    onAskDelete: () => setConfirmarId(r.id),
+    onConfirmDelete: () => { eliminar(r.id); setConfirmarId(null) },
+    onCancelDelete: () => setConfirmarId(null),
+  })
+
+  // ── Orden de compra: se arma con los que están por debajo del mínimo ────────
+  const sugerido = (r) => Math.max(1, (Number(r.stockMinimo) || 0) - (Number(r.stockActual) || 0))
+  const cantDe = (r) => pedidoCant[r.id] ?? sugerido(r)      // cantidad a pedir (default sugerido)
+  const selDe = (r) => pedidoSel[r.id] !== false             // incluido en la orden (default sí)
+  const provDe = (r) => (r.marca || '').trim() || 'Sin proveedor'
+  const gruposPedido = {}
+  pendientes.forEach(r => { (gruposPedido[provDe(r)] = gruposPedido[provDe(r)] || []).push(r) })
+  const seleccionadosPedido = pendientes.filter(selDe)
+  const totalUnidadesPedido = seleccionadosPedido.reduce((s, r) => s + cantDe(r), 0)
+  const provsPedido = new Set(seleccionadosPedido.map(provDe)).size
+
+  function construirTextoOrden() {
+    const fecha = new Date().toLocaleDateString('es-AR')
+    let t = `Orden de compra — BitácoraAR\n${sector.label} · ${fecha}\n`
+    Object.entries(gruposPedido).forEach(([prov, items]) => {
+      const sel = items.filter(selDe)
+      if (!sel.length) return
+      t += `\n${prov}\n`
+      sel.forEach(r => {
+        t += `• ${r.codigo}${r.descripcion ? ' — ' + r.descripcion : ''} — pedir ${cantDe(r)} (stock ${r.stockActual}, mín ${r.stockMinimo})\n`
+      })
+    })
+    t += `\nTotal: ${seleccionadosPedido.length} repuestos · ${totalUnidadesPedido} unidades`
+    return t
+  }
+  async function copiarLista() {
+    try {
+      await navigator.clipboard.writeText(construirTextoOrden())
+      setCopiado(true); setTimeout(() => setCopiado(false), 2000)
+    } catch { /* clipboard no disponible */ }
+  }
+  function enviarPedidoWhatsApp() {
+    window.open('https://wa.me/?text=' + encodeURIComponent(construirTextoOrden()), '_blank')
+  }
+
+  // ── Ficha motor: horas de marcha y service de aceite ────────────────────────
+  const horasMotor = Number(fichaMotor.horasMarcha) || 0
+  const intervaloAc = Number(fichaMotor.intervaloAceite) || 250
+  const ultimoAc = Number(fichaMotor.horasUltimoAceite) || 0
+  const recorridasAc = Math.max(0, horasMotor - ultimoAc)
+  const faltanAceite = intervaloAc - recorridasAc
+  const progAceite = Math.max(0, Math.min(1, recorridasAc / intervaloAc))
+  const aceiteCerca = faltanAceite <= Math.max(20, intervaloAc * 0.1)
+
+  // ── Artes de pesca: inventario con condición ────────────────────────────────
+  const artesItems = artes.items || []
+  const cuentaArtes = { ok: 0, revisar: 0, fuera: 0 }
+  artesItems.forEach(a => { cuentaArtes[a.condicion] = (cuentaArtes[a.condicion] || 0) + 1 })
+  const chipsArte = [
+    { id: 'todas', label: 'Todas', n: artesItems.length, dot: null },
+    { id: 'ok', label: 'En condición', n: cuentaArtes.ok, dot: CONDICIONES.ok.color },
+    { id: 'revisar', label: 'A revisar', n: cuentaArtes.revisar, dot: CONDICIONES.revisar.color },
+    { id: 'fuera', label: 'Fuera de uso', n: cuentaArtes.fuera, dot: CONDICIONES.fuera.color },
+  ]
+  const qa = sinAcentos(busquedaArte.trim())
+  const artesFiltrados = artesItems.filter(a => {
+    if (qa && !sinAcentos(`${a.nombre} ${a.tipo} ${a.detalle}`).includes(qa)) return false
+    if (filtroArte !== 'todas' && a.condicion !== filtroArte) return false
+    return true
+  })
+  const unidadesArtes = artesItems.reduce((s, a) => s + (Number(a.cantidad) || 0), 0)
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#070f1e', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+    <div className="fixed inset-0 z-50 flex flex-col" style={{
+      background: '#070f1e',
+      paddingTop: 'env(safe-area-inset-top, 0px)',
+      '--accent': sector.accent,
+      '--accent-soft': sector.accentSoft,
+      '--accent-line': sector.accentLine,
+    }}>
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-navy-700 bg-navy-800 flex-shrink-0">
         <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-xl ${sector.bg} border ${sector.border} flex items-center justify-center`}>
-            <Icon size={18} className={sector.colorClass} />
+          <div className="w-9 h-9 rounded-xl border flex items-center justify-center"
+            style={{ background: 'var(--accent-soft)', borderColor: 'var(--accent-line)' }}>
+            <Icon size={18} style={{ color: 'var(--accent)' }} />
           </div>
           <div>
             <p className="text-sm font-semibold text-white">{sector.label}</p>
@@ -400,8 +669,8 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
           ...(seccion === 'cubierta' || seccion === 'puente' ? [['artes', 'Artes de pesca']] : []),
         ].map(([id, label]) => (
           <button key={id} onClick={() => setVista(id)}
-            className={`flex-shrink-0 flex-1 py-2.5 text-xs font-semibold transition-colors border-b-2 ${vista === id ? sector.colorClass : 'text-slate-500 hover:text-slate-300 border-transparent'}`}
-            style={vista === id ? { borderBottomColor: sector.color } : {}}>
+            className={`flex-shrink-0 flex-1 py-2.5 text-xs font-semibold transition-colors border-b-2 ${vista === id ? '' : 'text-slate-500 hover:text-slate-300 border-transparent'}`}
+            style={vista === id ? { color: 'var(--accent)', borderBottomColor: 'var(--accent)' } : {}}>
             {label}
             {id === 'pedido' && pendientes.length > 0 && (
               <span className="ml-1.5 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{pendientes.length}</span>
@@ -411,20 +680,37 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
       </div>
 
       {/* Contenido scrolleable */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
 
         {/* ===== VISTA STOCK ===== */}
         {vista === 'stock' && (
           <div>
-            {/* Botón agregar / formulario */}
-            {!modoAgregar ? (
-              <div className="p-4">
+            {/* input de cámara: siempre montado (lo usan el form y el empty state) */}
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={procesarFoto} />
+
+            {/* Toolbar: búsqueda en vivo + agregar. Solo con repuestos cargados. */}
+            {!modoAgregar && repuestos.length > 0 && (
+              <div className="p-4 flex flex-col sm:flex-row gap-2 sticky top-0 z-10 bg-[#070f1e]">
+                <div className="relative w-full sm:flex-1">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                  <input
+                    value={busqueda}
+                    onChange={e => setBusqueda(e.target.value)}
+                    placeholder="Buscar por código, descripción o marca…"
+                    className="pl-9 text-sm"
+                    style={{ height: 46, borderRadius: 13 }}
+                  />
+                </div>
                 <button onClick={() => { setEditandoId(null); setModoAgregar(true) }}
-                  className="w-full flex items-center justify-center gap-2 border border-dashed border-navy-600 hover:border-cyan-500/50 text-slate-500 hover:text-cyan-400 py-3 rounded-xl transition-colors text-sm">
-                  <Camera size={16} /> Fotografiar / agregar repuesto
+                  className="w-full sm:w-auto sm:flex-shrink-0 flex items-center justify-center gap-2 px-4 text-sm font-semibold"
+                  style={{ height: 46, borderRadius: 13, background: 'var(--accent)', color: '#07131f' }}>
+                  <Camera size={16} /> Agregar repuesto
                 </button>
               </div>
-            ) : (
+            )}
+
+            {/* Formulario alta/edición */}
+            {modoAgregar && (
               <div className="m-4 bg-navy-800 border border-navy-700 rounded-xl p-4 space-y-3">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   {editandoId ? 'Editar repuesto' : 'Nuevo repuesto'}
@@ -439,12 +725,11 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
                       : <><Camera size={20} className="text-slate-500" /><span className="text-[9px] text-slate-600">Foto</span></>
                     }
                   </button>
-                  <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={procesarFoto} />
                   <div className="flex-1 bg-navy-700/50 rounded-lg px-3 py-2 flex flex-col justify-center">
                     {ocr.progreso
                       ? <div className="flex items-center gap-2 text-xs text-slate-400"><Loader size={13} className="animate-spin" /> Leyendo código...</div>
                       : ocr.codigo
-                        ? <><p className="text-[10px] text-slate-500">Código detectado</p><p className="text-sm font-bold text-cyan-400">{ocr.codigo}</p><p className="text-[10px] text-green-500">OCR automático · verificá antes de guardar</p></>
+                        ? <><p className="text-[10px] text-slate-500">Código detectado</p><p className="text-sm font-bold" style={{ color: 'var(--accent)' }}>{ocr.codigo}</p><p className="text-[10px] text-green-500">OCR automático · verificá antes de guardar</p></>
                         : <>
                             <p className="text-xs text-slate-400 font-medium">Foto del código</p>
                             <p className="text-[10px] text-slate-500 leading-tight mt-0.5">· De frente, a 15–20 cm<br/>· Buena luz, sin reflejo<br/>· Enfocá solo el número</p>
@@ -492,30 +777,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
               </div>
             )}
 
-            {/* Mini stats siempre visibles */}
-            <div className="grid grid-cols-3 gap-0 border-b border-navy-700 mx-0">
-              {[
-                { label: 'Ítems', val: repuestos.length, color: '#94a3b8' },
-                { label: 'En stock', val: repuestos.reduce((s,r) => s + r.stockActual, 0), color: '#34d399' },
-                { label: 'Alertas', val: pendientes.length, color: pendientes.length > 0 ? '#f87171' : '#94a3b8' },
-              ].map((s, i) => (
-                <div key={s.label} className="text-center py-3" style={{borderRight: i < 2 ? '1px solid #112240' : 'none'}}>
-                  <p className="text-xl font-black" style={{color: s.color}}>{cargando ? '—' : s.val}</p>
-                  <p className="text-[10px] text-slate-600 uppercase tracking-wider font-medium">{s.label}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Cabecera de columnas */}
-            <div className="flex items-center gap-3 px-4 py-2 border-b border-navy-700/50">
-              <div className="w-10 flex-shrink-0" />
-              <div className="flex-1 text-[10px] text-slate-600 uppercase tracking-wider font-semibold">Código · Descripción</div>
-              <div className="text-[10px] text-slate-600 uppercase tracking-wider font-semibold w-16 text-center">Stock</div>
-              <div className="text-[10px] text-slate-600 uppercase tracking-wider font-semibold w-12 text-center">Estado</div>
-              <div className="w-12" />
-            </div>
-
-            {/* Lista de repuestos */}
+            {/* Estados: cargando · vacío · lista */}
             {cargando ? (
               <div className="divide-y divide-navy-700">
                 {[0,1,2].map(i => (
@@ -531,82 +793,70 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
                 ))}
               </div>
             ) : repuestos.length === 0 ? (
-              <div>
-                {/* Skeleton fantasma — 3 filas vacías */}
-                {[0,1,2].map(i => (
-                  <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-navy-700/30" style={{opacity: 1 - i * 0.25}}>
-                    <div className="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center" style={{background:'#112240',border:'1px dashed #1e3a5f'}}>
-                      <span className="text-slate-700 text-xs">IMG</span>
-                    </div>
-                    <div className="flex-1 space-y-1.5">
-                      <div className="h-3 rounded" style={{background:'#112240',width: i === 0 ? '40%' : i === 1 ? '55%' : '35%'}} />
-                      <div className="h-2 rounded" style={{background:'#0d1829',width: i === 0 ? '60%' : i === 1 ? '45%' : '50%'}} />
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-7 h-7 rounded-lg" style={{background:'#112240'}} />
-                      <div className="w-5 h-5 rounded" style={{background:'#0d1829'}} />
-                      <div className="w-7 h-7 rounded-lg" style={{background:'#112240'}} />
-                    </div>
-                    <div className="w-12 h-5 rounded-full" style={{background:'#112240'}} />
-                  </div>
-                ))}
-                <div className="text-center py-6 px-8">
-                  <p className="text-slate-600 text-xs">La planilla se completa al cargar el primer repuesto</p>
-                  <p className="text-slate-700 text-xs mt-1">Usá el botón de cámara para empezar</p>
-                </div>
-              </div>
+              !modoAgregar && (
+                <EmptyRepuestos
+                  seccionLabel={sector.label}
+                  onFoto={() => { setEditandoId(null); fileRef.current?.click() }}
+                  onManual={() => { setEditandoId(null); setModoAgregar(true) }}
+                />
+              )
             ) : (
-              <div className="divide-y divide-navy-700">
-                {repuestos.map(r => {
-                  const c = colorStock(r.stockActual, r.stockMinimo)
-                  return (
-                    <div key={r.id} className="flex items-center gap-3 px-4 py-3">
-                      <div className="w-10 h-10 rounded-lg bg-navy-700 border border-navy-600 flex-shrink-0 overflow-hidden">
-                        {r.foto
-                          ? <img src={r.foto} className="w-full h-full object-cover" />
-                          : <div className="w-full h-full flex items-center justify-center text-slate-600 text-lg">🔧</div>
-                        }
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-white truncate">{r.codigo}</p>
-                        <p className="text-xs text-slate-500 truncate">{[r.marca, r.descripcion].filter(Boolean).join(' · ') || r.categoria}</p>
-                      </div>
-                      {/* Controles stock */}
-                      <div className="flex items-center gap-1.5">
-                        <button onClick={() => actualizarStock(r.id, Math.max(0, r.stockActual - 1))}
-                          className="w-7 h-7 rounded-lg bg-navy-700 border border-navy-600 flex items-center justify-center text-slate-400 hover:text-white hover:border-slate-500 transition-colors">
-                          <Minus size={12} />
-                        </button>
-                        <span className={`text-sm font-bold w-6 text-center ${c.text}`}>{r.stockActual}</span>
-                        <button onClick={() => actualizarStock(r.id, r.stockActual + 1)}
-                          className="w-7 h-7 rounded-lg bg-navy-700 border border-navy-600 flex items-center justify-center text-slate-400 hover:text-white hover:border-slate-500 transition-colors">
-                          <Plus size={12} />
-                        </button>
-                      </div>
-                      {/* Badge estado */}
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${c.bg} ${c.text} w-10 text-center`}>{c.label}</span>
-                      {/* Editar / Eliminar */}
-                      {confirmarId === r.id ? (
-                        <div className="flex gap-1">
-                          <button onClick={() => { eliminar(r.id); setConfirmarId(null) }}
-                            className="text-[10px] bg-red-600 text-white px-2 py-1 rounded">Sí</button>
-                          <button onClick={() => setConfirmarId(null)}
-                            className="text-[10px] bg-navy-700 text-slate-400 px-2 py-1 rounded">No</button>
+              <>
+                {/* Chips: filtro por estado + total de unidades */}
+                <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-navy-700">
+                  {chipsEstado.map(ch => {
+                    const activo = filtroEstado === ch.id
+                    return (
+                      <button key={ch.id} onClick={() => setFiltroEstado(ch.id)}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 border transition-colors"
+                        style={activo
+                          ? { background: 'var(--accent-soft)', borderColor: 'var(--accent-line)', color: 'var(--accent)' }
+                          : { background: '#0d1829', borderColor: '#1a304e', color: '#94a3b8' }}>
+                        {ch.dot && <span className="w-1.5 h-1.5 rounded-full" style={{ background: ch.dot }} />}
+                        {ch.label}
+                        <span className="tabular-nums opacity-90">{ch.n}</span>
+                      </button>
+                    )
+                  })}
+                  <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-3 py-1.5 border"
+                    style={{ background: '#0d1829', borderColor: '#112240', color: '#94a3b8' }}>
+                    Unidades totales
+                    <span className="font-bold tabular-nums" style={{ color: '#34d399' }}>{unidadesTotales}</span>
+                  </span>
+                </div>
+
+                {/* Lista agrupada */}
+                {repuestosFiltrados.length === 0 ? (
+                  <div className="text-center py-10 px-6 text-slate-500 text-sm">
+                    Sin resultados{busqueda ? ` para «${busqueda}»` : ' con este filtro'}.
+                  </div>
+                ) : (
+                  <div>
+                    {requieren.length > 0 && (
+                      <>
+                        <div className="flex items-center gap-2 px-4 pt-4 pb-1.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#fbbf24' }}>
+                            Requieren reposición · {requieren.length}
+                          </span>
+                          <div className="flex-1 h-px" style={{ background: 'rgba(251,191,36,0.25)' }} />
                         </div>
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => abrirEdicion(r)} className="btn-ghost p-1 rounded" title="Editar">
-                            <Pencil size={13} className="text-cyan-400" />
-                          </button>
-                          <button onClick={() => setConfirmarId(r.id)} className="btn-ghost p-1 rounded" title="Eliminar">
-                            <Trash2 size={13} className="text-slate-600 hover:text-red-400" />
-                          </button>
+                        {requieren.map(r => <FilaRepuesto key={r.id} r={r} {...filaProps(r)} />)}
+                      </>
+                    )}
+                    {enOrden.length > 0 && (
+                      <>
+                        <div className="flex items-center gap-2 px-4 pt-4 pb-1.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            En orden · {enOrden.length}
+                          </span>
+                          <div className="flex-1 h-px bg-navy-700" />
                         </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+                        {enOrden.map(r => <FilaRepuesto key={r.id} r={r} {...filaProps(r)} />)}
+                      </>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -616,60 +866,108 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
           <div className="p-4 space-y-4">
             <p className="text-[10px] text-slate-500 uppercase tracking-widest">Datos técnicos del motor · se guardan por barco</p>
 
-            {[
-              { key: 'motorPrincipal', title: 'Motor principal', fields: [
-                { k: 'marca', label: 'Marca', placeholder: 'Caterpillar, MAN, Volvo...' },
-                { k: 'modelo', label: 'Modelo', placeholder: '3412, D2868, D13...' },
-                { k: 'potenciaHP', label: 'Potencia (HP)', placeholder: '820', type: 'number' },
-                { k: 'potenciaKW', label: 'Potencia (kW)', placeholder: '612', type: 'number' },
-                { k: 'cilindrada', label: 'Cilindrada (L)', placeholder: '27.0', type: 'number' },
-                { k: 'rpmMax', label: 'RPM máximas', placeholder: '2100', type: 'number' },
-                { k: 'nroSerie', label: 'Nº de serie', placeholder: 'CAT-XXXXXX' },
-                { k: 'año', label: 'Año', placeholder: '2012', type: 'number' },
-              ]},
-              { key: 'auxiliar1', title: 'Auxiliar 1', fields: [
-                { k: 'marca', label: 'Marca', placeholder: 'Volvo, Perkins...' },
-                { k: 'modelo', label: 'Modelo', placeholder: '' },
-                { k: 'potenciaHP', label: 'Potencia (HP)', placeholder: '', type: 'number' },
-                { k: 'potenciaKW', label: 'Potencia (kW)', placeholder: '', type: 'number' },
-              ]},
-              { key: 'auxiliar2', title: 'Auxiliar 2', fields: [
-                { k: 'marca', label: 'Marca', placeholder: '' },
-                { k: 'modelo', label: 'Modelo', placeholder: '' },
-                { k: 'potenciaHP', label: 'Potencia (HP)', placeholder: '', type: 'number' },
-                { k: 'potenciaKW', label: 'Potencia (kW)', placeholder: '', type: 'number' },
-              ]},
-            ].map(({ key, title, fields }) => (
-              <div key={key} className="bg-navy-800 border border-navy-700 rounded-xl p-4 space-y-3">
-                <p className="text-xs font-bold text-cyan-400 uppercase tracking-wider">{title}</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {fields.map(f => (
-                    <div key={f.k}>
-                      <label className="text-[10px] text-slate-500 mb-0.5 block">{f.label}</label>
-                      <input
-                        type={f.type || 'text'}
-                        placeholder={f.placeholder}
-                        value={fichaMotor[key]?.[f.k] || ''}
-                        onChange={e => setMotor(key, f.k, e.target.value)}
-                        className="text-sm w-full"
-                      />
+            {/* Identificación + Horas de marcha */}
+            <div className="grid grid-cols-1 sm:grid-cols-[1.4fr_1fr] gap-3">
+              {/* Identificación */}
+              <div className="bg-navy-800 border border-navy-700 rounded-xl p-4">
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Identificación</p>
+                <input value={fichaMotor.motorPrincipal?.marca || ''} onChange={e => setMotor('motorPrincipal', 'marca', e.target.value)}
+                  placeholder="[Marca]" className="w-full text-lg font-bold text-white placeholder-slate-600" style={{ background: 'transparent', border: 'none', padding: 0 }} />
+                <input value={fichaMotor.motorPrincipal?.modelo || ''} onChange={e => setMotor('motorPrincipal', 'modelo', e.target.value)}
+                  placeholder="[Modelo]" className="w-full text-sm text-slate-400 placeholder-slate-600" style={{ background: 'transparent', border: 'none', padding: 0 }} />
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
+                  {[
+                    { k: 'nroSerie', label: 'N° de serie', mono: true },
+                    { k: 'potenciaKW', label: 'Potencia (kW)', type: 'number' },
+                    { k: 'año', label: 'Año', type: 'number' },
+                    { k: 'combustible', label: 'Combustible' },
+                    { k: 'reductor', label: 'Reductor' },
+                    { k: 'relacion', label: 'Relación' },
+                  ].map(c => (
+                    <div key={c.k}>
+                      <label className="text-[10px] text-slate-500 mb-0.5 block">{c.label}</label>
+                      <input type={c.type || 'text'} placeholder={`[${c.label}]`}
+                        value={fichaMotor.motorPrincipal?.[c.k] || ''}
+                        onChange={e => setMotor('motorPrincipal', c.k, e.target.value)}
+                        className={`text-sm w-full placeholder-slate-600 ${c.mono ? 'font-mono' : ''}`} />
                     </div>
                   ))}
                 </div>
               </div>
-            ))}
 
-            <button
-              onClick={guardarFichaMotor}
-              disabled={fichaMotorGuardando}
+              {/* Horas de marcha */}
+              <div className="bg-navy-800 border border-navy-700 rounded-xl p-4 flex flex-col">
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Horas de marcha</p>
+                <div className="flex items-baseline gap-1">
+                  <input type="number" value={fichaMotor.horasMarcha || ''} onChange={e => setFicha('horasMarcha', e.target.value)}
+                    placeholder="0" className="text-3xl font-black text-white w-28 placeholder-slate-700" style={{ background: 'transparent', border: 'none', padding: 0 }} />
+                  <span className="text-sm text-slate-500">hs</span>
+                </div>
+                <div className="mt-3 h-2 rounded-full bg-navy-700 overflow-hidden">
+                  <div className="h-full rounded-full transition-all" style={{ width: `${progAceite * 100}%`, background: aceiteCerca ? '#fbbf24' : 'var(--accent)' }} />
+                </div>
+                <p className="text-[11px] mt-1.5" style={{ color: aceiteCerca ? '#fbbf24' : '#64748b' }}>
+                  Próximo service de aceite: {faltanAceite >= 0 ? `faltan ${faltanAceite} hs` : `vencido hace ${-faltanAceite} hs`}
+                </p>
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  <div><label className="text-[10px] text-slate-500 mb-0.5 block">Cada (hs)</label>
+                    <input type="number" placeholder="250" value={fichaMotor.intervaloAceite || ''} onChange={e => setFicha('intervaloAceite', e.target.value)} className="text-sm w-full" /></div>
+                  <div><label className="text-[10px] text-slate-500 mb-0.5 block">Último a (hs)</label>
+                    <input type="number" placeholder="0" value={fichaMotor.horasUltimoAceite || ''} onChange={e => setFicha('horasUltimoAceite', e.target.value)} className="text-sm w-full" /></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Mantenimiento programado */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest">Mantenimiento programado</p>
+                <button onClick={addMant} className="text-xs flex items-center gap-1 hover:opacity-80" style={{ color: 'var(--accent)' }}>
+                  <Plus size={13} /> Agregar tarea
+                </button>
+              </div>
+              {(fichaMotor.mantenimiento || []).length === 0 ? (
+                <p className="text-xs text-slate-600 bg-navy-800 border border-navy-700 rounded-xl px-3 py-4 text-center">
+                  Sin tareas. Agregá el cambio de aceite, filtros, etc. con su intervalo en horas.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {(fichaMotor.mantenimiento || []).map((t, i) => {
+                    const est = estadoTarea(horasMotor, t.proximo, t.cada)
+                    const repBajo = t.codigo && repuestos.some(r => (r.codigo || '').toUpperCase() === t.codigo.toUpperCase() && estadoStock(r.stockActual, r.stockMinimo) !== 'ok')
+                    return (
+                      <div key={i} className="bg-navy-800 border border-navy-700 rounded-xl p-3">
+                        <div className="flex items-center gap-2">
+                          {repBajo && <span title="Repuesto en bajo stock" className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#fbbf24' }} />}
+                          <input value={t.tarea} onChange={e => setMant(i, 'tarea', e.target.value)} placeholder="Tarea (ej: Cambio de aceite)"
+                            className="flex-1 min-w-0 text-sm text-white placeholder-slate-600" style={{ background: 'transparent', border: 'none', padding: 0 }} />
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+                            style={{ color: est.color, background: `${est.color}1a`, border: `1px solid ${est.color}4d` }}>{est.label}</span>
+                          <button onClick={() => delMant(i)} aria-label="Borrar tarea" className="text-slate-600 hover:text-red-400 flex-shrink-0"><Trash2 size={13} /></button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 mt-2">
+                          <div><label className="text-[10px] text-slate-500 mb-0.5 block">Cada (hs)</label>
+                            <input type="number" placeholder="250" value={t.cada || ''} onChange={e => setMant(i, 'cada', e.target.value)} className="text-sm w-full" /></div>
+                          <div><label className="text-[10px] text-slate-500 mb-0.5 block">Próximo a (hs)</label>
+                            <input type="number" placeholder="1400" value={t.proximo || ''} onChange={e => setMant(i, 'proximo', e.target.value)} className="text-sm w-full" /></div>
+                          <div><label className="text-[10px] text-slate-500 mb-0.5 block">Repuesto (cód.)</label>
+                            <input placeholder="P553000" value={t.codigo || ''} onChange={e => setMant(i, 'codigo', e.target.value.toUpperCase())} className="text-sm w-full font-mono" /></div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            <button onClick={guardarFichaMotor} disabled={fichaMotorGuardando}
               className="w-full btn-primary py-3 flex items-center justify-center gap-2 text-sm"
               style={{ background: fichaMotorGuardado ? '#059669' : undefined }}>
               {fichaMotorGuardando
                 ? <><Loader size={15} className="animate-spin" /> Guardando...</>
                 : fichaMotorGuardado
                   ? '✓ Guardado'
-                  : <><Save size={15} /> Guardar ficha técnica</>
-              }
+                  : <><Save size={15} /> Guardar ficha técnica</>}
             </button>
           </div>
         )}
@@ -677,89 +975,166 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
         {/* ===== VISTA ARTES DE PESCA (cubierta + puente, datos compartidos) ===== */}
         {vista === 'artes' && (seccion === 'cubierta' || seccion === 'puente') && (
           <div className="p-4 space-y-3">
-            <div className="flex items-center gap-2 mb-1">
-              <p className="text-[10px] text-slate-500 uppercase tracking-widest flex-1">Medidas del arte de pesca · compartido cubierta y puente</p>
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] text-slate-500 uppercase tracking-widest flex-1">Inventario de artes · compartido cubierta y puente</p>
               <span className="text-[9px] px-2 py-0.5 rounded" style={{ background: '#6d28d920', color: '#c084fc', border: '1px solid #6d28d940' }}>Datos compartidos</span>
             </div>
 
-            {[
-              {
-                key: 'warps', title: 'Warps · Cables de arrastre', color: '#f59e0b',
-                fields: [
-                  { k: 'longitud', label: 'Longitud (m)', placeholder: '600', type: 'number' },
-                  { k: 'diametro', label: 'Diámetro (mm)', placeholder: '24', type: 'number' },
-                  { k: 'material', label: 'Material', placeholder: 'Acero 6×36 IWRC' },
-                ],
-              },
-              {
-                key: 'portones', title: 'Portones · Otter boards', color: '#06b6d4',
-                fields: [
-                  { k: 'peso', label: 'Peso (kg)', placeholder: '800', type: 'number' },
-                  { k: 'envergadura', label: 'Envergadura (m²)', placeholder: '4.5', type: 'number' },
-                  { k: 'tipo', label: 'Tipo', placeholder: 'Polyvalent, Baca, Oval...' },
-                  { k: 'angulo', label: 'Ángulo ataque (°)', placeholder: '45', type: 'number' },
-                ],
-              },
-              {
-                key: 'malletas', title: 'Malletas · Bridas', color: '#10b981',
-                fields: [
-                  { k: 'longitud', label: 'Longitud (m)', placeholder: '120', type: 'number' },
-                  { k: 'diametro', label: 'Diámetro (mm)', placeholder: '18', type: 'number' },
-                ],
-              },
-              {
-                key: 'red', title: 'Red · Aparejo', color: '#a855f7',
-                fields: [
-                  { k: 'aberturaH', label: 'Abertura horiz. (m)', placeholder: '28', type: 'number' },
-                  { k: 'aberturaV', label: 'Abertura vert. (m)', placeholder: '4', type: 'number' },
-                  { k: 'mallasCuerpo', label: 'Malla cuerpo (mm)', placeholder: '110', type: 'number' },
-                  { k: 'mallasSaco', label: 'Malla saco (mm)', placeholder: '60', type: 'number' },
-                ],
-              },
-            ].map(({ key, title, color, fields }) => {
-              const abierto = artesExpandido[key]
-              return (
-                <div key={key} className="bg-navy-800 border border-navy-700 rounded-xl overflow-hidden">
-                  <button
-                    className="w-full flex items-center justify-between px-4 py-3"
-                    onClick={() => setArtesExpandido(e => ({ ...e, [key]: !e[key] }))}>
-                    <p className="text-xs font-bold uppercase tracking-wider" style={{ color }}>{title}</p>
-                    {abierto ? <ChevronUp size={15} className="text-slate-500" /> : <ChevronDown size={15} className="text-slate-500" />}
+            {/* Formulario alta/edición */}
+            {modoArte && (
+              <div className="bg-navy-800 border border-navy-700 rounded-xl p-4 space-y-3">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{editandoArteId ? 'Editar arte' : 'Nuevo arte'}</p>
+                <input placeholder="Nombre (ej: Red de arrastre)" value={formArte.nombre}
+                  onChange={e => setFormArte(f => ({ ...f, nombre: e.target.value }))} className="text-sm" />
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className="text-[10px] text-slate-500 mb-0.5 block">Tipo</label>
+                    <select value={formArte.tipo} onChange={e => setFormArte(f => ({ ...f, tipo: e.target.value }))} className="text-sm">
+                      {TIPOS_ARTE.map(t => <option key={t}>{t}</option>)}
+                    </select></div>
+                  <div><label className="text-[10px] text-slate-500 mb-0.5 block">Detalle</label>
+                    <input value={formArte.detalle} onChange={e => setFormArte(f => ({ ...f, detalle: e.target.value }))} placeholder="Medidas, material…" className="text-sm" /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className="text-[10px] text-slate-500 mb-0.5 block">Cantidad</label>
+                    <input type="number" min="0" value={formArte.cantidad} onChange={e => setFormArte(f => ({ ...f, cantidad: e.target.value }))} className="text-sm" /></div>
+                  <div><label className="text-[10px] text-slate-500 mb-0.5 block">Unidad</label>
+                    <input value={formArte.unidad} onChange={e => setFormArte(f => ({ ...f, unidad: e.target.value }))} placeholder="u, m, kg" className="text-sm" /></div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-500 mb-1 block">Condición</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {Object.entries(CONDICIONES).map(([k, c]) => {
+                      const activo = formArte.condicion === k
+                      return (
+                        <button key={k} onClick={() => setFormArte(f => ({ ...f, condicion: k }))}
+                          className="text-xs font-semibold rounded-lg py-2 border transition-colors"
+                          style={activo ? { color: c.color, background: `${c.color}1a`, borderColor: `${c.color}66` } : { color: '#64748b', background: '#0d1829', borderColor: '#1a304e' }}>
+                          {c.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {editandoArteId && (
+                    <button onClick={() => eliminarArteItem(editandoArteId)} className="btn-danger py-2 px-3 text-sm rounded-lg">Borrar</button>
+                  )}
+                  <button onClick={() => { setModoArte(false); setEditandoArteId(null); setFormArte(arteVacio) }} className="flex-1 btn-ghost py-2 text-sm rounded-lg">Cancelar</button>
+                  <button onClick={guardarArteItem} disabled={!formArte.nombre.trim()} className="flex-1 btn-primary py-2 text-sm disabled:opacity-40">
+                    {editandoArteId ? 'Guardar' : 'Agregar'}
                   </button>
-                  {abierto && (
-                    <div className="px-4 pb-4">
-                      <div className="grid grid-cols-2 gap-2">
-                        {fields.map(f => (
-                          <div key={f.k}>
-                            <label className="text-[10px] text-slate-500 mb-0.5 block">{f.label}</label>
-                            <input
-                              type={f.type || 'text'}
-                              placeholder={f.placeholder}
-                              value={artes[key]?.[f.k] || ''}
-                              onChange={e => setArte(key, f.k, e.target.value)}
-                              className="text-sm w-full"
-                            />
+                </div>
+              </div>
+            )}
+
+            {/* Empty state */}
+            {artesItems.length === 0 && !modoArte && (
+              <div className="px-6 py-10 flex flex-col items-center text-center">
+                <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ background: 'var(--accent-soft)', border: '1px solid var(--accent-line)' }}>
+                  <Anchor size={26} style={{ color: 'var(--accent)' }} />
+                </div>
+                <h3 className="text-white font-semibold text-base mb-1.5">Cargá el primer arte de pesca</h3>
+                <p className="text-slate-400 text-sm max-w-xs mb-5 leading-relaxed">
+                  Redes, puertas, malletas, cabos… Registralos con su cantidad y condición para llevar el control.
+                </p>
+                <button onClick={() => { setEditandoArteId(null); setFormArte(arteVacio); setModoArte(true) }}
+                  className="flex items-center justify-center gap-2 py-2.5 px-5 rounded-lg text-sm font-semibold" style={{ background: 'var(--accent)', color: '#07131f' }}>
+                  <Plus size={16} /> Agregar arte
+                </button>
+              </div>
+            )}
+
+            {/* Toolbar: buscador + agregar */}
+            {!modoArte && artesItems.length > 0 && (
+              <div className="flex flex-col sm:flex-row gap-2 sticky top-0 z-10 bg-[#070f1e] py-1">
+                <div className="relative w-full sm:flex-1">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                  <input value={busquedaArte} onChange={e => setBusquedaArte(e.target.value)}
+                    placeholder="Buscar por nombre, tipo o detalle…" className="pl-9 text-sm" style={{ height: 46, borderRadius: 13 }} />
+                </div>
+                <button onClick={() => { setEditandoArteId(null); setFormArte(arteVacio); setModoArte(true) }}
+                  className="w-full sm:w-auto sm:flex-shrink-0 flex items-center justify-center gap-2 px-4 text-sm font-semibold"
+                  style={{ height: 46, borderRadius: 13, background: 'var(--accent)', color: '#07131f' }}>
+                  <Plus size={16} /> Agregar arte
+                </button>
+              </div>
+            )}
+
+            {/* Chips de condición */}
+            {!modoArte && artesItems.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                {chipsArte.map(ch => {
+                  const activo = filtroArte === ch.id
+                  return (
+                    <button key={ch.id} onClick={() => setFiltroArte(ch.id)}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 border transition-colors"
+                      style={activo
+                        ? { background: 'var(--accent-soft)', borderColor: 'var(--accent-line)', color: 'var(--accent)' }
+                        : { background: '#0d1829', borderColor: '#1a304e', color: '#94a3b8' }}>
+                      {ch.dot && <span className="w-1.5 h-1.5 rounded-full" style={{ background: ch.dot }} />}
+                      {ch.label}<span className="tabular-nums opacity-90">{ch.n}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Lista de artes */}
+            {!modoArte && artesItems.length > 0 && (
+              <div className="-mx-4">
+                {artesFiltrados.length === 0 ? (
+                  <div className="text-center py-10 px-6 text-slate-500 text-sm">
+                    Sin resultados{busquedaArte ? ` para «${busquedaArte}»` : ' con este filtro'}.
+                  </div>
+                ) : artesFiltrados.map(a => {
+                  const cond = CONDICIONES[a.condicion] || CONDICIONES.ok
+                  return (
+                    <div key={a.id} className="border-b border-navy-700/40">
+                      {/* Mobile: tarjeta */}
+                      <div className="sm:hidden flex flex-col gap-2.5 px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-[52px] h-[52px] rounded-lg bg-navy-700 border border-navy-600 flex-shrink-0 flex items-center justify-center text-2xl">{ICONO_ARTE[a.tipo] || '⚓'}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-semibold text-white text-sm truncate">{a.nombre}</span>
+                              <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-navy-700 border border-navy-600 text-slate-400">{a.tipo}</span>
+                            </div>
                           </div>
-                        ))}
+                          <span className="flex-shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1"
+                            style={{ color: cond.color, background: `${cond.color}1a`, border: `1px solid ${cond.color}4d` }}>
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ background: cond.color }} />{cond.label}
+                          </span>
+                        </div>
+                        {a.detalle && <p className="text-xs text-slate-500 pl-[64px] -mt-1">{a.detalle}</p>}
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-white"><b className="tabular-nums">{a.cantidad}</b> <span className="text-slate-500 text-xs">{a.unidad}</span></span>
+                          <button onClick={() => abrirEdicionArte(a)} aria-label="Editar"
+                            className="ml-auto w-11 h-11 rounded-lg border border-navy-600 flex items-center justify-center"><Pencil size={15} style={{ color: 'var(--accent)' }} /></button>
+                        </div>
+                      </div>
+                      {/* sm+ : fila */}
+                      <div className="hidden sm:flex items-center gap-3 px-4 py-3">
+                        <div className="w-[52px] h-[52px] rounded-lg bg-navy-700 border border-navy-600 flex-shrink-0 flex items-center justify-center text-2xl">{ICONO_ARTE[a.tipo] || '⚓'}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-semibold text-white text-sm truncate">{a.nombre}</span>
+                            <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-navy-700 border border-navy-600 text-slate-400">{a.tipo}</span>
+                          </div>
+                          {a.detalle && <p className="text-xs text-slate-500 truncate mt-0.5">{a.detalle}</p>}
+                        </div>
+                        <div className="text-right flex-shrink-0 w-14"><p className="text-sm font-bold text-white tabular-nums leading-tight">{a.cantidad}</p><p className="text-[10px] text-slate-600">{a.unidad}</p></div>
+                        <span className="flex-shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1"
+                          style={{ color: cond.color, background: `${cond.color}1a`, border: `1px solid ${cond.color}4d` }}>
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: cond.color }} />{cond.label}
+                        </span>
+                        <button onClick={() => abrirEdicionArte(a)} title="Editar" aria-label="Editar"
+                          className="w-8 h-8 rounded-lg border border-navy-600 hover:border-navy-500 flex items-center justify-center flex-shrink-0"><Pencil size={13} style={{ color: 'var(--accent)' }} /></button>
                       </div>
                     </div>
-                  )}
-                </div>
-              )
-            })}
-
-            <button
-              onClick={guardarArtes}
-              disabled={artesGuardando}
-              className="w-full btn-primary py-3 flex items-center justify-center gap-2 text-sm"
-              style={{ background: artesGuardado ? '#059669' : undefined }}>
-              {artesGuardando
-                ? <><Loader size={15} className="animate-spin" /> Guardando...</>
-                : artesGuardado
-                  ? '✓ Guardado'
-                  : <><Save size={15} /> Guardar artes de pesca</>
-              }
-            </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -772,42 +1147,77 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
               </div>
             ) : (
               <>
-                <p className="text-xs text-slate-500 px-4 pt-4 pb-2">Repuestos con stock igual o menor al mínimo configurado</p>
-                <div className="divide-y divide-navy-700">
-                  {pendientes.map(r => {
-                    const c = colorStock(r.stockActual, r.stockMinimo)
-                    return (
-                      <div key={r.id} className="flex items-center gap-3 px-4 py-3">
-                        <div className="w-10 h-10 rounded-lg bg-navy-700 border border-navy-600 flex-shrink-0 overflow-hidden">
-                          {r.foto
-                            ? <img src={r.foto} className="w-full h-full object-cover" />
-                            : <div className="w-full h-full flex items-center justify-center text-slate-600 text-lg">🔧</div>
-                          }
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-white">{r.codigo}</p>
-                          <p className="text-xs text-slate-500">{r.marca || ''} {r.descripcion || r.categoria}</p>
-                          <p className={`text-xs ${c.text}`}>Stock: {r.stockActual} ud. (mínimo {r.stockMinimo})</p>
-                        </div>
-                        {/* Cantidad a pedir */}
-                        <div className="flex flex-col items-center gap-0.5">
-                          <p className="text-[9px] text-slate-600">Pedir</p>
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => actualizarCantPedir(r.id, Math.max(1, (r.cantPedir || 1) - 1))}
-                              className="w-6 h-6 rounded bg-navy-700 border border-navy-600 flex items-center justify-center text-slate-400">
-                              <Minus size={10} />
-                            </button>
-                            <span className="text-sm font-bold text-white w-5 text-center">{r.cantPedir || 1}</span>
-                            <button onClick={() => actualizarCantPedir(r.id, (r.cantPedir || 1) + 1)}
-                              className="w-6 h-6 rounded bg-navy-700 border border-navy-600 flex items-center justify-center text-slate-400">
-                              <Plus size={10} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
+                {/* Aviso ámbar */}
+                <div className="m-4 flex items-start gap-2.5 rounded-xl px-3.5 py-3"
+                  style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)' }}>
+                  <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" style={{ color: '#fbbf24' }} />
+                  <p className="text-xs leading-relaxed" style={{ color: '#fde4a6' }}>
+                    <b style={{ color: '#fbbf24' }}>{pendientes.length} repuesto{pendientes.length === 1 ? '' : 's'}</b> {pendientes.length === 1 ? 'está' : 'están'} por debajo del mínimo. Armamos la orden con la cantidad justa para volver al nivel objetivo.
+                  </p>
                 </div>
+
+                {/* Grupos por proveedor / marca */}
+                {Object.entries(gruposPedido).map(([prov, items]) => (
+                  <div key={prov}>
+                    <div className="flex items-center gap-2 px-4 pt-3 pb-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{prov} · {items.length}</span>
+                      <div className="flex-1 h-px bg-navy-700" />
+                    </div>
+                    {items.map(r => {
+                      const faltan = Math.max(0, (Number(r.stockMinimo) || 0) - (Number(r.stockActual) || 0))
+                      const cant = cantDe(r)
+                      const sel = selDe(r)
+                      return (
+                        <div key={r.id} className={`px-4 py-3 border-b border-navy-700/40 ${sel ? '' : 'opacity-50'}`}>
+                          {(() => {
+                            const checkbox = (
+                              <button onClick={() => setPedidoSel(s => ({ ...s, [r.id]: !sel }))} aria-label="Incluir en la orden"
+                                className="flex-shrink-0 w-6 h-6 rounded-md border flex items-center justify-center transition-colors"
+                                style={sel ? { background: 'var(--accent)', borderColor: 'var(--accent)' } : { borderColor: '#1a304e' }}>
+                                {sel && <Check size={14} style={{ color: '#07131f' }} />}
+                              </button>
+                            )
+                            const info = (
+                              <div className="flex-1 min-w-0">
+                                <p className="font-mono font-bold text-white text-sm truncate">{r.codigo}</p>
+                                {(r.descripcion || r.categoria) && <p className="text-xs text-slate-500 truncate">{r.descripcion || r.categoria}</p>}
+                              </div>
+                            )
+                            const faltanEl = (
+                              <div className="text-right flex-shrink-0">
+                                <p className="text-xs font-semibold" style={{ color: r.stockActual === 0 ? '#f87171' : '#fbbf24' }}>faltan {faltan}</p>
+                                <p className="text-[10px] text-slate-600 whitespace-nowrap">stock {r.stockActual} · mín {r.stockMinimo}</p>
+                              </div>
+                            )
+                            const stepper = (
+                              <div className="inline-flex items-center rounded-lg border border-navy-600 overflow-hidden flex-shrink-0">
+                                <button onClick={() => setPedidoCant(c => ({ ...c, [r.id]: Math.max(1, cant - 1) }))} aria-label="Restar"
+                                  className="w-11 h-11 sm:w-8 sm:h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-navy-700 transition-colors"><Minus size={15} /></button>
+                                <span className="w-10 sm:w-8 text-center text-sm font-bold tabular-nums text-white">{cant}</span>
+                                <button onClick={() => setPedidoCant(c => ({ ...c, [r.id]: cant + 1 }))} aria-label="Sumar"
+                                  className="w-11 h-11 sm:w-8 sm:h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-navy-700 transition-colors"><Plus size={15} /></button>
+                              </div>
+                            )
+                            return (
+                              <>
+                                {/* Mobile: datos arriba, stepper grande abajo */}
+                                <div className="sm:hidden flex flex-col gap-2.5">
+                                  <div className="flex items-center gap-3">{checkbox}{info}{faltanEl}</div>
+                                  <div className="flex items-center gap-3 pl-9">
+                                    <span className="text-[11px] text-slate-500">Pedir</span>
+                                    {stepper}
+                                  </div>
+                                </div>
+                                {/* sm+ : fila */}
+                                <div className="hidden sm:flex items-center gap-3">{checkbox}{info}{faltanEl}{stepper}</div>
+                              </>
+                            )
+                          })()}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ))}
               </>
             )}
           </div>
@@ -817,21 +1227,44 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
       {/* Footer fijo */}
       <div className="flex-shrink-0 border-t border-navy-700 bg-navy-800 p-4">
         {vista === 'stock' && (
-          <div className="flex justify-between items-center text-sm">
-            <div>
-              <span className="text-slate-500 text-xs">Total stock</span>
-              <p className="text-white font-semibold">{repuestos.reduce((s, r) => s + r.stockActual, 0)} unidades · {repuestos.length} tipos</p>
-            </div>
-            {pendientes.length > 0 && (
-              <span className="text-xs text-red-400 font-medium">{pendientes.length} bajo mínimo</span>
-            )}
+          <div className="flex justify-between items-center gap-3 text-xs">
+            <span className="text-slate-400">
+              Total en stock: <span className="text-white font-semibold">{unidadesTotales} unidades</span> en <span className="text-white font-semibold">{repuestos.length} repuestos</span>
+            </span>
+            <span className="text-slate-500 whitespace-nowrap">
+              Última actualización: <span className="text-slate-300">{haceCuanto(ultimaAct)}</span>
+            </span>
+          </div>
+        )}
+        {vista === 'artes' && (seccion === 'cubierta' || seccion === 'puente') && (
+          <div className="flex justify-between items-center gap-3 text-xs">
+            <span className="text-slate-400">
+              Total: <b className="text-white">{unidadesArtes} unidades</b> en <b className="text-white">{artesItems.length} arte{artesItems.length === 1 ? '' : 's'}</b>
+            </span>
+            <span className="whitespace-nowrap">
+              {(cuentaArtes.revisar + cuentaArtes.fuera) === 0
+                ? <span style={{ color: '#34d399' }}>Todo en condición</span>
+                : <><span style={{ color: '#fbbf24' }}>{cuentaArtes.revisar} a revisar</span> · <span style={{ color: '#f87171' }}>{cuentaArtes.fuera} fuera de uso</span></>}
+            </span>
           </div>
         )}
         {vista === 'pedido' && pendientes.length > 0 && (
-          <button onClick={() => exportarPDF(repuestos)}
-            className="w-full btn-primary py-3 flex items-center justify-center gap-2 text-sm">
-            <FileText size={16} /> Exportar orden de compra PDF
-          </button>
+          <div className="space-y-2.5">
+            <p className="text-xs text-slate-400 text-center sm:text-left">
+              <b className="text-white">{seleccionadosPedido.length}</b> repuesto{seleccionadosPedido.length === 1 ? '' : 's'} · <b className="text-white">{totalUnidadesPedido}</b> unidades a pedir · <b className="text-white">{provsPedido}</b> proveedor{provsPedido === 1 ? '' : 'es'}
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button onClick={copiarLista} disabled={seleccionadosPedido.length === 0}
+                className="flex-1 btn-ghost py-3 rounded-lg text-sm flex items-center justify-center gap-2 disabled:opacity-40">
+                <Copy size={15} /> {copiado ? '¡Copiado!' : 'Copiar lista'}
+              </button>
+              <button onClick={enviarPedidoWhatsApp} disabled={seleccionadosPedido.length === 0}
+                className="flex-1 py-3 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-40"
+                style={{ background: 'var(--accent)', color: '#07131f' }}>
+                <MessageCircle size={15} /> Enviar pedido
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
