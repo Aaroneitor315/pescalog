@@ -1,21 +1,52 @@
+import { useRef } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { RefreshCw, X } from 'lucide-react'
 
 // Aviso de versión nueva. Con registerType:'prompt', el service worker nuevo
-// espera; acá detectamos ese estado y ofrecemos aplicarlo al toque en vez de
-// depender de que el usuario cierre la app.
+// espera; acá detectamos ese estado y ofrecemos aplicarlo al toque.
+//
+// La recarga NO se delega en updateServiceWorker(), porque esa depende del
+// evento `controllerchange`, que sin clients.claim() (que evitamos a propósito,
+// ver CLAUDE.md) nunca se dispara y el botón "no hace nada". En su lugar
+// mandamos SKIP_WAITING al worker en espera y recargamos cuando pasa a
+// `activated`, con un fallback por timeout.
 const INTERVALO_CHEQUEO = 15 * 60 * 1000 // 15 min
 
 export default function ActualizacionPWA() {
+  const regRef = useRef(null)
+  const recargandoRef = useRef(false)
+
   const {
     needRefresh: [hayVersionNueva, setHayVersionNueva],
-    updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(_url, r) {
-      // Revisa periódicamente si hay versión nueva, sin recargar la página.
+      regRef.current = r
       if (r) setInterval(() => r.update(), INTERVALO_CHEQUEO)
     },
   })
+
+  function recargarUnaVez() {
+    if (recargandoRef.current) return
+    recargandoRef.current = true
+    window.location.reload()
+  }
+
+  function actualizar() {
+    const r = regRef.current
+    const enEspera = r && r.waiting
+    if (enEspera) {
+      // Recarga cuando el SW nuevo termina de activarse.
+      enEspera.addEventListener('statechange', (e) => {
+        if (e.target.state === 'activated') recargarUnaVez()
+      })
+      enEspera.postMessage({ type: 'SKIP_WAITING' })
+      // Fallback: si por algún motivo no llega el statechange, recargá igual.
+      setTimeout(recargarUnaVez, 2000)
+    } else {
+      // No hay worker en espera (ya se activó): recarga directa.
+      recargarUnaVez()
+    }
+  }
 
   if (!hayVersionNueva) return null
 
@@ -34,7 +65,7 @@ export default function ActualizacionPWA() {
           <p className="text-xs text-slate-400">Actualizá para ver las últimas novedades.</p>
         </div>
         <button
-          onClick={() => updateServiceWorker(true)}
+          onClick={actualizar}
           className="btn-primary flex-shrink-0 text-sm px-4 py-2"
         >
           Actualizar
