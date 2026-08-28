@@ -975,10 +975,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
         {/* ===== VISTA ARTES DE PESCA (cubierta + puente, datos compartidos) ===== */}
         {vista === 'artes' && (seccion === 'cubierta' || seccion === 'puente') && (
           <div className="p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <p className="text-[10px] text-slate-500 uppercase tracking-widest flex-1">Inventario de artes · compartido cubierta y puente</p>
-              <span className="text-[9px] px-2 py-0.5 rounded" style={{ background: '#6d28d920', color: '#c084fc', border: '1px solid #6d28d940' }}>Datos compartidos</span>
-            </div>
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest">Inventario de artes</p>
 
             {/* Formulario alta/edición */}
             {modoArte && (
