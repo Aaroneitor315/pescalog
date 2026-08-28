@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Camera, Plus, Minus, Trash2, Wrench, Anchor, Loader, Pencil, Save, Search, AlertTriangle, Check, Copy, MessageCircle } from 'lucide-react'
+import { X, Camera, Plus, Minus, Trash2, Wrench, Anchor, Loader, Pencil, Save, Search, AlertTriangle, Check, Copy, MessageCircle, Package, ClipboardCheck, ChevronDown, ChevronUp } from 'lucide-react'
 import { createWorker } from 'tesseract.js'
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import { getDoc, setDoc, doc } from 'firebase/firestore'
 import { storage, db } from '../firebase'
 import { useRepuestos } from '../hooks/useRepuestos'
 import StatusPill, { estadoStock, colorEstado } from './StatusPill'
+import SalaMaquinas from './SalaMaquinas'
+import { estadoTarea, estadoMotor, motorTieneAlerta, fechaEstimadaProximo } from '../lib/motores'
 
 // Cada sección aporta su color de acento. Se expone como variables CSS
 // (--accent / --accent-soft / --accent-line) en la raíz del modal, así el resto
@@ -160,18 +162,6 @@ function extraerCodigo(texto) {
 // Normaliza para búsqueda: minúsculas y sin acentos.
 const sinAcentos = (s) => (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 
-// Estado de una tarea de mantenimiento según horas actuales vs "próximo a".
-function estadoTarea(horas, proximo, cada) {
-  const p = Number(proximo) || 0
-  const h = Number(horas) || 0
-  if (!p) return { label: 'OK', color: '#34d399' }
-  if (h >= p) return { label: 'Vencido', color: '#f87171' }
-  const faltan = p - h
-  const umbral = Math.max(20, (Number(cada) || 0) * 0.15)
-  if (faltan <= umbral) return { label: `En ${faltan} hs`, color: '#fbbf24' }
-  return { label: 'OK', color: '#34d399' }
-}
-
 // Condición de un arte de pesca (equivalente al "estado" del stock).
 const CONDICIONES = {
   ok:      { label: 'En condición', color: '#34d399' },
@@ -180,6 +170,58 @@ const CONDICIONES = {
 }
 const TIPOS_ARTE = ['Red', 'Puertas', 'Malleta', 'Cabo', 'Cable', 'Grillete', 'Boya', 'Otro']
 const ICONO_ARTE = { Red: '🕸️', Puertas: '🚪', Malleta: '🪢', Cabo: '🪢', Cable: '🔗', Grillete: '⛓️', Boya: '🟠', Otro: '⚓' }
+
+const fmtDDMM = (d) => d ? `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}` : null
+const hoyISO = () => new Date().toISOString().slice(0, 10)
+
+// ── Modelo de motores (lista por barco) + migración desde la ficha vieja ──────
+function nuevoId() {
+  return (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
+}
+const IDENT_VACIA = { marca: '', modelo: '', serie: '', potenciaKw: '', anio: '', combustible: '', reductor: '', relacion: '' }
+function motorVacio(rol = 'principal', nombre = 'Motor principal') {
+  return { id: nuevoId(), rol, nombre, identificacion: { ...IDENT_VACIA }, horas: '', tareas: [] }
+}
+// Convierte la ficha vieja (motor único) en lista de motores. Idempotente:
+// si ya hay `motores`, la devuelve sin tocar.
+function migrarAMotores(data) {
+  if (Array.isArray(data.motores)) return data.motores
+  const mp = data.motorPrincipal || {}
+  const tareas = []
+  if (data.intervaloAceite || data.horasUltimoAceite) {
+    tareas.push({ id: nuevoId(), nombre: 'Cambio de aceite', intervaloHs: data.intervaloAceite ?? '', ultimoHs: data.horasUltimoAceite ?? '', ultimaFecha: '', historial: [], codigo: '' })
+  }
+  ;(data.mantenimiento || []).forEach(t => {
+    const cada = Number(t.cada) || 0
+    const prox = Number(t.proximo) || 0
+    tareas.push({ id: nuevoId(), nombre: t.tarea || '', intervaloHs: t.cada ?? '', ultimoHs: (prox && cada) ? String(prox - cada) : '', ultimaFecha: '', historial: [], codigo: t.codigo || '' })
+  })
+  const motores = [{
+    id: nuevoId(), rol: 'principal', nombre: 'Motor principal',
+    identificacion: {
+      marca: mp.marca || '', modelo: mp.modelo || '', serie: mp.nroSerie || '',
+      potenciaKw: mp.potenciaKW || '', anio: mp.año || '', combustible: mp.combustible || '',
+      reductor: mp.reductor || '', relacion: mp.relacion || '',
+      // Extras conservados (no se pierden aunque la UI nueva no los muestre):
+      potenciaHp: mp.potenciaHP || '', cilindrada: mp.cilindrada || '', rpmMax: mp.rpmMax || '',
+    },
+    horas: data.horasMarcha ?? '',
+    tareas,
+  }]
+  ;['auxiliar1', 'auxiliar2'].forEach((k, i) => {
+    const a = data[k] || {}
+    if (a.marca || a.modelo || a.potenciaKW || a.potenciaHP) {
+      motores.push({
+        id: nuevoId(), rol: 'auxiliar', nombre: `Auxiliar ${i + 1}`,
+        identificacion: { ...IDENT_VACIA, marca: a.marca || '', modelo: a.modelo || '', potenciaKw: a.potenciaKW || '', potenciaHp: a.potenciaHP || '' },
+        horas: '', tareas: [],
+      })
+    }
+  })
+  return motores
+}
 
 // Empty state de la vista Repuestos: guía para cargar el primero.
 function EmptyRepuestos({ seccionLabel, onFoto, onManual }) {
@@ -326,6 +368,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
   const { repuestos, cargando, agregar, editar, actualizarStock, eliminar } = useRepuestos(uid, seccion)
   const vistaInicial = 'stock'
   const [vista, setVista] = useState(vistaInicial)
+  const [segmentoRep, setSegmentoRep] = useState('inventario') // inventario | orden
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('todos') // todos | ok | low | out
   const [pedidoCant, setPedidoCant] = useState({}) // cantidad a pedir por id (override del sugerido)
@@ -343,16 +386,14 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
 
 
   // Ficha técnica motor (solo maquinas)
-  const fichaMotorVacia = {
-    motorPrincipal: { marca: '', modelo: '', potenciaHP: '', potenciaKW: '', cilindrada: '', rpmMax: '', nroSerie: '', año: '', combustible: '', reductor: '', relacion: '' },
-    auxiliar1: { marca: '', modelo: '', potenciaHP: '', potenciaKW: '' },
-    auxiliar2: { marca: '', modelo: '', potenciaHP: '', potenciaKW: '' },
-    horasMarcha: '',
-    intervaloAceite: '',   // hs entre services de aceite
-    horasUltimoAceite: '', // horas al último cambio de aceite
-    mantenimiento: [],     // [{ tarea, cada, proximo, codigo }]
-  }
-  const [fichaMotor, setFichaMotor] = useState(fichaMotorVacia)
+  // Ficha del barco: doc con `motores` (lista). Se conservan campos viejos por
+  // compatibilidad; la UI usa `motores`.
+  const [fichaMotor, setFichaMotor] = useState({ motores: [] })
+  const [motorSelId, setMotorSelId] = useState('') // motor seleccionado en el esquema
+  const [registro, setRegistro] = useState(null)   // { ti, fecha, horas, nota } | null
+  const [histAbierto, setHistAbierto] = useState({}) // { [tareaId]: bool }
+  const [addMotorOpen, setAddMotorOpen] = useState(false)
+  const [nuevoNombre, setNuevoNombre] = useState('')
   const [fichaMotorGuardando, setFichaMotorGuardando] = useState(false)
   const [fichaMotorGuardado, setFichaMotorGuardado] = useState(false)
 
@@ -376,7 +417,15 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     if (!uid) return
     if (seccion === 'maquinas') {
       getDoc(doc(db, 'usuarios', uid, 'fichas', 'maquinas')).then(snap => {
-        if (snap.exists()) setFichaMotor({ ...fichaMotorVacia, ...snap.data() })
+        const data = snap.exists() ? snap.data() : {}
+        const yaMigrado = Array.isArray(data.motores)
+        let motores = migrarAMotores(data)
+        if (motores.length === 0) motores = [motorVacio()]
+        setFichaMotor({ ...data, motores })
+        // Migración: escribe `motores` una sola vez por barco (doc existente sin migrar).
+        if (!yaMigrado && snap.exists()) {
+          setDoc(doc(db, 'usuarios', uid, 'fichas', 'maquinas'), { motores }, { merge: true }).catch(() => {})
+        }
       }).catch(() => {})
     }
     if (seccion === 'cubierta' || seccion === 'puente') {
@@ -423,20 +472,63 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
   }
 
 
-  function setMotor(motor, campo, valor) {
-    setFichaMotor(f => ({ ...f, [motor]: { ...f[motor], [campo]: valor } }))
+  // Helpers sobre la lista de motores (idx = índice del motor).
+  function setMotorIdent(idx, campo, valor) {
+    setFichaMotor(f => {
+      const motores = [...(f.motores || [])]
+      motores[idx] = { ...motores[idx], identificacion: { ...motores[idx].identificacion, [campo]: valor } }
+      return { ...f, motores }
+    })
   }
-  function setFicha(campo, valor) {
-    setFichaMotor(f => ({ ...f, [campo]: valor }))
+  function setMotorCampo(idx, campo, valor) {
+    setFichaMotor(f => {
+      const motores = [...(f.motores || [])]
+      motores[idx] = { ...motores[idx], [campo]: valor }
+      return { ...f, motores }
+    })
   }
-  function setMant(i, campo, valor) {
-    setFichaMotor(f => ({ ...f, mantenimiento: (f.mantenimiento || []).map((t, j) => j === i ? { ...t, [campo]: valor } : t) }))
+  function setTarea(idx, ti, campo, valor) {
+    setFichaMotor(f => {
+      const motores = [...(f.motores || [])]
+      const tareas = (motores[idx].tareas || []).map((t, j) => j === ti ? { ...t, [campo]: valor } : t)
+      motores[idx] = { ...motores[idx], tareas }
+      return { ...f, motores }
+    })
   }
-  function addMant() {
-    setFichaMotor(f => ({ ...f, mantenimiento: [...(f.mantenimiento || []), { tarea: '', cada: '', proximo: '', codigo: '' }] }))
+  function addTarea(idx) {
+    setFichaMotor(f => {
+      const motores = [...(f.motores || [])]
+      const tareas = [...(motores[idx].tareas || []), { id: nuevoId(), nombre: '', intervaloHs: '', ultimoHs: '', ultimaFecha: '', historial: [], codigo: '' }]
+      motores[idx] = { ...motores[idx], tareas }
+      return { ...f, motores }
+    })
   }
-  function delMant(i) {
-    setFichaMotor(f => ({ ...f, mantenimiento: (f.mantenimiento || []).filter((_, j) => j !== i) }))
+  function delTarea(idx, ti) {
+    setFichaMotor(f => {
+      const motores = [...(f.motores || [])]
+      motores[idx] = { ...motores[idx], tareas: (motores[idx].tareas || []).filter((_, j) => j !== ti) }
+      return { ...f, motores }
+    })
+  }
+  function crearMotorExtra() {
+    const nombre = (nuevoNombre || '').trim() || `Motor ${(fichaMotor.motores?.length || 0) + 1}`
+    const nuevo = motorVacio('extra', nombre)
+    const motores = [...(fichaMotor.motores || []), nuevo]
+    setFichaMotor(f => ({ ...f, motores }))
+    setDoc(doc(db, 'usuarios', uid, 'fichas', 'maquinas'), { motores }, { merge: true }).catch(() => {})
+    setMotorSelId(nuevo.id)
+    setAddMotorOpen(false); setNuevoNombre('')
+  }
+  function eliminarMotorExtra(id) {
+    const motores = (fichaMotor.motores || []).filter(m => m.id !== id)
+    setFichaMotor(f => ({ ...f, motores }))
+    setDoc(doc(db, 'usuarios', uid, 'fichas', 'maquinas'), { motores }, { merge: true }).catch(() => {})
+    if (motorSelId === id) setMotorSelId('')
+  }
+  function toggleNoEquipado(rol) {
+    const noEquipado = { ...(fichaMotor.noEquipado || {}), [rol]: !(fichaMotor.noEquipado?.[rol]) }
+    setFichaMotor(f => ({ ...f, noEquipado }))
+    setDoc(doc(db, 'usuarios', uid, 'fichas', 'maquinas'), { noEquipado }, { merge: true }).catch(() => {})
   }
 
 
@@ -607,14 +699,60 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     window.open('https://wa.me/?text=' + encodeURIComponent(construirTextoOrden()), '_blank')
   }
 
-  // ── Ficha motor: horas de marcha y service de aceite ────────────────────────
-  const horasMotor = Number(fichaMotor.horasMarcha) || 0
-  const intervaloAc = Number(fichaMotor.intervaloAceite) || 250
-  const ultimoAc = Number(fichaMotor.horasUltimoAceite) || 0
-  const recorridasAc = Math.max(0, horasMotor - ultimoAc)
-  const faltanAceite = intervaloAc - recorridasAc
-  const progAceite = Math.max(0, Math.min(1, recorridasAc / intervaloAc))
-  const aceiteCerca = faltanAceite <= Math.max(20, intervaloAc * 0.1)
+  // ── Ficha motor: se edita el motor SELECCIONADO en el esquema ────────────────
+  const motoresLista = fichaMotor.motores || []
+  const motorSel = motoresLista.find(m => m.id === motorSelId)
+    || motoresLista.find(m => m.rol === 'principal') || motoresLista[0]
+    || { identificacion: {}, horas: '', tareas: [] }
+  const motorSelIdx = motoresLista.findIndex(m => m.id === motorSel.id) // -1 si lista vacía
+  const motorAct = motorSel
+  const tareasMotor = motorAct.tareas || []
+  const horasMotor = Number(motorAct.horas) || 0
+  // Estado del motor seleccionado (helper compartido, siempre por horas).
+  const emSel = estadoMotor(motorSel)
+  const urgTarea = emSel.peorTarea       // tarea que marca el próximo service
+  const urgCerca = emSel.key !== 'al_dia'
+  let progUrg = 0
+  if (urgTarea) {
+    const int = Number(urgTarea.intervaloHs) || 1
+    const rec = Math.max(0, horasMotor - (Number(urgTarea.ultimoHs) || 0))
+    progUrg = Math.max(0, Math.min(1, rec / int))
+  }
+  const fEstUrg = urgTarea ? fechaEstimadaProximo(urgTarea, horasMotor) : null
+  // "N alertas" = motores con al menos una tarea en 'proximo' o 'vencido'.
+  const alertasMotor = motoresLista.filter(motorTieneAlerta).length
+  const motoresExtra = motoresLista.filter(m => m.rol === 'extra')
+
+  // Persiste la lista de motores en el acto (setDoc merge) además del estado.
+  async function persistirMotores(nextMotores) {
+    setFichaMotor(f => ({ ...f, motores: nextMotores }))
+    try { await setDoc(doc(db, 'usuarios', uid, 'fichas', 'maquinas'), { motores: nextMotores }, { merge: true }) } catch { /* offline */ }
+  }
+  // Aplica un cambio a una tarea del motor seleccionado y persiste.
+  function actualizarTarea(ti, cambio) {
+    const motores = (fichaMotor.motores || []).map((m, mi) => mi !== motorSelIdx ? m : {
+      ...m,
+      tareas: (m.tareas || []).map((t, j) => j === ti ? cambio(t) : t),
+    })
+    persistirMotores(motores)
+  }
+  // Registrar un service: abre el registro; al confirmar agrega al historial y
+  // reinicia el cálculo (ultimoHs/ultimaFecha = lo registrado). Persiste ya.
+  function abrirRegistro(ti) {
+    setRegistro({ ti, fecha: hoyISO(), horas: motorAct.horas || '', nota: '' })
+  }
+  function confirmarRegistro() {
+    if (!registro) return
+    const { ti, fecha, horas, nota } = registro
+    actualizarTarea(ti, t => ({
+      ...t, ultimoHs: horas, ultimaFecha: fecha,
+      historial: [...(t.historial || []), { fecha, horas, nota }],
+    }))
+    setRegistro(null)
+  }
+  function borrarHistorial(ti, hi) {
+    actualizarTarea(ti, t => ({ ...t, historial: (t.historial || []).filter((_, k) => k !== hi) }))
+  }
 
   // ── Artes de pesca: inventario con condición ────────────────────────────────
   const artesItems = artes.items || []
@@ -652,7 +790,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
           </div>
           <div>
             <p className="text-sm font-semibold text-white">{sector.label}</p>
-            <p className="text-xs text-slate-500">{repuestos.length} repuesto{repuestos.length !== 1 ? 's' : ''} · {pendientes.length} alerta{pendientes.length !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-slate-500">{repuestos.length} repuesto{repuestos.length !== 1 ? 's' : ''} · {(seccion === 'maquinas' ? alertasMotor : pendientes.length)} alerta{(seccion === 'maquinas' ? alertasMotor : pendientes.length) !== 1 ? 's' : ''}</p>
           </div>
         </div>
         <button onClick={onCerrar} className="btn-ghost p-2 rounded-lg">
@@ -660,30 +798,54 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-0 border-b border-navy-700 bg-navy-800 flex-shrink-0 overflow-x-auto scrollbar-none">
+      {/* Tabs — 2 pastillas con acento de la sección */}
+      <div className="flex gap-2 px-4 py-3 border-b border-navy-700 bg-navy-800 flex-shrink-0">
         {[
-          ['stock', 'Repuestos'],
-          ['pedido', 'Orden compra'],
-          ...(seccion === 'maquinas' ? [['ficha', 'Ficha motor']] : []),
-          ...(seccion === 'cubierta' || seccion === 'puente' ? [['artes', 'Artes de pesca']] : []),
-        ].map(([id, label]) => (
-          <button key={id} onClick={() => setVista(id)}
-            className={`flex-shrink-0 flex-1 py-2.5 text-xs font-semibold transition-colors border-b-2 ${vista === id ? '' : 'text-slate-500 hover:text-slate-300 border-transparent'}`}
-            style={vista === id ? { color: 'var(--accent)', borderBottomColor: 'var(--accent)' } : {}}>
-            {label}
-            {id === 'pedido' && pendientes.length > 0 && (
-              <span className="ml-1.5 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{pendientes.length}</span>
-            )}
-          </button>
-        ))}
+          seccion === 'maquinas'
+            ? { id: 'ficha', label: 'Motores', Icon: Wrench, n: (fichaMotor.motores || []).length, alertas: alertasMotor }
+            : { id: 'artes', label: 'Artes', Icon: Anchor, n: artesItems.length, alertas: 0 },
+          { id: 'stock', label: 'Repuestos', Icon: Package, n: repuestos.length, alertas: pendientes.length },
+        ].map(({ id, label, Icon, n, alertas }) => {
+          const activo = vista === id
+          return (
+            <button key={id} onClick={() => setVista(id)}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-colors"
+              style={activo
+                ? { background: 'var(--accent-soft)', borderColor: 'var(--accent-line)', color: 'var(--accent)' }
+                : { background: '#0d1829', borderColor: '#1a304e', color: '#94a3b8' }}>
+              <Icon size={16} />
+              {label}
+              <span className="text-xs opacity-80 tabular-nums">({n})</span>
+              {alertas > 0 && <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{alertas}</span>}
+            </button>
+          )
+        })}
       </div>
+
+      {/* Sub-header: segmento Inventario / Orden de compra (solo en Repuestos) */}
+      {vista === 'stock' && (
+        <div className="px-4 py-2 border-b border-navy-700 bg-navy-800 flex-shrink-0">
+          <div className="flex gap-1 bg-navy-900 border border-navy-700 rounded-xl p-1">
+            {[['inventario', 'Inventario', 0], ['orden', 'Orden de compra', pendientes.length]].map(([id, label, badge]) => {
+              const activo = segmentoRep === id
+              return (
+                <button key={id} onClick={() => setSegmentoRep(id)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-colors"
+                  style={activo ? { background: 'var(--accent)', color: '#07131f' } : { color: '#94a3b8' }}>
+                  {label}
+                  {badge > 0 && <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{badge}</span>}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Contenido scrolleable */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
 
-        {/* ===== VISTA STOCK ===== */}
-        {vista === 'stock' && (
+        {/* ===== VISTA STOCK — INVENTARIO ===== */}
+        {vista === 'stock' && segmentoRep === 'inventario' && (
           <div>
             {/* input de cámara: siempre montado (lo usan el form y el empty state) */}
             <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={procesarFoto} />
@@ -858,28 +1020,89 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
                 )}
               </>
             )}
+
+            {/* Recordatorio: repuestos bajo mínimo → ir a la orden de compra */}
+            {pendientes.length > 0 && (
+              <div className="m-4 flex items-center gap-3 rounded-xl px-3.5 py-3"
+                style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)' }}>
+                <AlertTriangle size={16} className="flex-shrink-0" style={{ color: '#fbbf24' }} />
+                <p className="text-xs flex-1" style={{ color: '#fde4a6' }}>
+                  <b style={{ color: '#fbbf24' }}>{pendientes.length}</b> {pendientes.length === 1 ? 'repuesto está' : 'repuestos están'} bajo mínimo.
+                </p>
+                <button onClick={() => setSegmentoRep('orden')}
+                  className="text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0"
+                  style={{ background: 'var(--accent)', color: '#07131f' }}>
+                  Ver orden de compra
+                </button>
+              </div>
+            )}
           </div>
         )}
 
         {/* ===== VISTA FICHA MOTOR (solo maquinas) ===== */}
         {vista === 'ficha' && seccion === 'maquinas' && (
           <div className="p-4 space-y-4">
-            <p className="text-[10px] text-slate-500 uppercase tracking-widest">Datos técnicos del motor · se guardan por barco</p>
+            {/* HERO — esquema de la sala de máquinas */}
+            <SalaMaquinas motores={motoresLista} seleccionado={motorSel.id} onSelect={setMotorSelId}
+              noEquipado={fichaMotor.noEquipado} onToggleNoEquipado={toggleNoEquipado} />
+
+            {/* Motores extra (fuera del esquema) */}
+            {motoresExtra.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {motoresExtra.map(m => {
+                  const em = estadoMotor(m)
+                  const sel = m.id === motorSel.id
+                  return (
+                    <div key={m.id} onClick={() => setMotorSelId(m.id)}
+                      className="cursor-pointer rounded-xl border p-3 flex items-center gap-2.5 transition-colors"
+                      style={sel ? { borderColor: 'var(--accent)', background: 'var(--accent-soft)' } : { borderColor: '#1a304e', background: '#0d1829' }}>
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: em.color }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">{m.nombre || 'Motor'}</p>
+                        <p className="text-[11px] text-slate-500">{(Number(m.horas) || 0).toLocaleString('es-AR')} hs</p>
+                      </div>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+                        style={{ color: em.color, background: `${em.color}1a`, border: `1px solid ${em.color}4d` }}>{em.label}</span>
+                      <button onClick={e => { e.stopPropagation(); eliminarMotorExtra(m.id) }} aria-label="Eliminar motor"
+                        className="w-11 h-11 sm:w-8 sm:h-8 rounded-lg border border-navy-600 hover:border-red-500/50 flex items-center justify-center flex-shrink-0"><Trash2 size={13} className="text-red-400" /></button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Barra: estado del motor seleccionado + agregar */}
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: emSel.color }} />
+              <span className="text-sm font-semibold text-white truncate">{motorSel.nombre || 'Motor'}</span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+                style={{ color: emSel.color, background: `${emSel.color}1a`, border: `1px solid ${emSel.color}4d` }}>{emSel.label}</span>
+              <button onClick={() => { setNuevoNombre(''); setAddMotorOpen(true) }}
+                className="ml-auto flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0"
+                style={{ background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent-line)' }}>
+                <Plus size={14} /> Agregar motor
+              </button>
+            </div>
 
             {/* Identificación + Horas de marcha */}
             <div className="grid grid-cols-1 sm:grid-cols-[1.4fr_1fr] gap-3">
               {/* Identificación */}
               <div className="bg-navy-800 border border-navy-700 rounded-xl p-4">
-                <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Identificación</p>
-                <input value={fichaMotor.motorPrincipal?.marca || ''} onChange={e => setMotor('motorPrincipal', 'marca', e.target.value)}
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-widest">Identificación</p>
+                  <input value={motorAct.nombre || ''} onChange={e => setMotorCampo(motorSelIdx, 'nombre', e.target.value)}
+                    placeholder="[Nombre]" className="text-[11px] text-slate-400 text-right placeholder-slate-600 max-w-[55%]"
+                    style={{ background: 'transparent', border: 'none', padding: 0 }} />
+                </div>
+                <input value={motorAct.identificacion?.marca || ''} onChange={e => setMotorIdent(motorSelIdx,'marca', e.target.value)}
                   placeholder="[Marca]" className="w-full text-lg font-bold text-white placeholder-slate-600" style={{ background: 'transparent', border: 'none', padding: 0 }} />
-                <input value={fichaMotor.motorPrincipal?.modelo || ''} onChange={e => setMotor('motorPrincipal', 'modelo', e.target.value)}
+                <input value={motorAct.identificacion?.modelo || ''} onChange={e => setMotorIdent(motorSelIdx,'modelo', e.target.value)}
                   placeholder="[Modelo]" className="w-full text-sm text-slate-400 placeholder-slate-600" style={{ background: 'transparent', border: 'none', padding: 0 }} />
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
                   {[
-                    { k: 'nroSerie', label: 'N° de serie', mono: true },
-                    { k: 'potenciaKW', label: 'Potencia (kW)', type: 'number' },
-                    { k: 'año', label: 'Año', type: 'number' },
+                    { k: 'serie', label: 'N° de serie', mono: true },
+                    { k: 'potenciaKw', label: 'Potencia (kW)', type: 'number' },
+                    { k: 'anio', label: 'Año', type: 'number' },
                     { k: 'combustible', label: 'Combustible' },
                     { k: 'reductor', label: 'Reductor' },
                     { k: 'relacion', label: 'Relación' },
@@ -887,8 +1110,8 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
                     <div key={c.k}>
                       <label className="text-[10px] text-slate-500 mb-0.5 block">{c.label}</label>
                       <input type={c.type || 'text'} placeholder={`[${c.label}]`}
-                        value={fichaMotor.motorPrincipal?.[c.k] || ''}
-                        onChange={e => setMotor('motorPrincipal', c.k, e.target.value)}
+                        value={motorAct.identificacion?.[c.k] || ''}
+                        onChange={e => setMotorIdent(motorSelIdx,c.k, e.target.value)}
                         className={`text-sm w-full placeholder-slate-600 ${c.mono ? 'font-mono' : ''}`} />
                     </div>
                   ))}
@@ -899,22 +1122,23 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
               <div className="bg-navy-800 border border-navy-700 rounded-xl p-4 flex flex-col">
                 <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Horas de marcha</p>
                 <div className="flex items-baseline gap-1">
-                  <input type="number" value={fichaMotor.horasMarcha || ''} onChange={e => setFicha('horasMarcha', e.target.value)}
+                  <input type="number" value={motorAct.horas || ''} onChange={e => setMotorCampo(motorSelIdx,'horas', e.target.value)}
                     placeholder="0" className="text-3xl font-black text-white w-28 placeholder-slate-700" style={{ background: 'transparent', border: 'none', padding: 0 }} />
                   <span className="text-sm text-slate-500">hs</span>
                 </div>
-                <div className="mt-3 h-2 rounded-full bg-navy-700 overflow-hidden">
-                  <div className="h-full rounded-full transition-all" style={{ width: `${progAceite * 100}%`, background: aceiteCerca ? '#fbbf24' : 'var(--accent)' }} />
-                </div>
-                <p className="text-[11px] mt-1.5" style={{ color: aceiteCerca ? '#fbbf24' : '#64748b' }}>
-                  Próximo service de aceite: {faltanAceite >= 0 ? `faltan ${faltanAceite} hs` : `vencido hace ${-faltanAceite} hs`}
-                </p>
-                <div className="grid grid-cols-2 gap-2 mt-3">
-                  <div><label className="text-[10px] text-slate-500 mb-0.5 block">Cada (hs)</label>
-                    <input type="number" placeholder="250" value={fichaMotor.intervaloAceite || ''} onChange={e => setFicha('intervaloAceite', e.target.value)} className="text-sm w-full" /></div>
-                  <div><label className="text-[10px] text-slate-500 mb-0.5 block">Último a (hs)</label>
-                    <input type="number" placeholder="0" value={fichaMotor.horasUltimoAceite || ''} onChange={e => setFicha('horasUltimoAceite', e.target.value)} className="text-sm w-full" /></div>
-                </div>
+                {urgTarea ? (
+                  <>
+                    <div className="mt-3 h-2 rounded-full bg-navy-700 overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${progUrg * 100}%`, background: urgCerca ? emSel.color : 'var(--accent)' }} />
+                    </div>
+                    <p className="text-[11px] mt-1.5 leading-snug" style={{ color: urgCerca ? emSel.color : '#64748b' }}>
+                      Próximo service: <b>{urgTarea.nombre || 'tarea'}</b> · {emSel.faltanMin >= 0 ? `faltan ${Math.round(emSel.faltanMin)} hs` : `vencido hace ${Math.round(-emSel.faltanMin)} hs`}
+                      {fEstUrg && <> · fecha est. {fmtDDMM(fEstUrg)}</>}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[11px] mt-3 text-slate-600">Agregá tareas de mantenimiento para ver el próximo service.</p>
+                )}
               </div>
             </div>
 
@@ -922,37 +1146,65 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
             <div>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[10px] text-slate-500 uppercase tracking-widest">Mantenimiento programado</p>
-                <button onClick={addMant} className="text-xs flex items-center gap-1 hover:opacity-80" style={{ color: 'var(--accent)' }}>
+                <button onClick={() => addTarea(motorSelIdx)} className="text-xs flex items-center gap-1 hover:opacity-80" style={{ color: 'var(--accent)' }}>
                   <Plus size={13} /> Agregar tarea
                 </button>
               </div>
-              {(fichaMotor.mantenimiento || []).length === 0 ? (
+              {tareasMotor.length === 0 ? (
                 <p className="text-xs text-slate-600 bg-navy-800 border border-navy-700 rounded-xl px-3 py-4 text-center">
                   Sin tareas. Agregá el cambio de aceite, filtros, etc. con su intervalo en horas.
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {(fichaMotor.mantenimiento || []).map((t, i) => {
-                    const est = estadoTarea(horasMotor, t.proximo, t.cada)
+                  {tareasMotor.map((t, i) => {
+                    const est = estadoTarea(t, horasMotor)
                     const repBajo = t.codigo && repuestos.some(r => (r.codigo || '').toUpperCase() === t.codigo.toUpperCase() && estadoStock(r.stockActual, r.stockMinimo) !== 'ok')
                     return (
-                      <div key={i} className="bg-navy-800 border border-navy-700 rounded-xl p-3">
+                      <div key={t.id || i} className="bg-navy-800 border border-navy-700 rounded-xl p-3">
                         <div className="flex items-center gap-2">
                           {repBajo && <span title="Repuesto en bajo stock" className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#fbbf24' }} />}
-                          <input value={t.tarea} onChange={e => setMant(i, 'tarea', e.target.value)} placeholder="Tarea (ej: Cambio de aceite)"
+                          <input value={t.nombre} onChange={e => setTarea(motorSelIdx,i, 'nombre', e.target.value)} placeholder="Tarea (ej: Cambio de aceite)"
                             className="flex-1 min-w-0 text-sm text-white placeholder-slate-600" style={{ background: 'transparent', border: 'none', padding: 0 }} />
                           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
                             style={{ color: est.color, background: `${est.color}1a`, border: `1px solid ${est.color}4d` }}>{est.label}</span>
-                          <button onClick={() => delMant(i)} aria-label="Borrar tarea" className="text-slate-600 hover:text-red-400 flex-shrink-0"><Trash2 size={13} /></button>
+                          <button onClick={() => abrirRegistro(i)} title="Registrar service" aria-label="Registrar service"
+                            className="w-11 h-11 sm:w-8 sm:h-8 rounded-lg border border-navy-600 hover:border-navy-500 flex items-center justify-center flex-shrink-0"><ClipboardCheck size={14} style={{ color: 'var(--accent)' }} /></button>
+                          <button onClick={() => delTarea(motorSelIdx,i)} aria-label="Borrar tarea" className="w-11 h-11 sm:w-8 sm:h-8 rounded-lg border border-navy-600 hover:border-red-500/50 flex items-center justify-center flex-shrink-0"><Trash2 size={13} className="text-red-400" /></button>
                         </div>
-                        <div className="grid grid-cols-3 gap-2 mt-2">
+                        {t.ultimaFecha && (
+                          <p className="text-[10px] text-slate-500 mt-1.5">Último service: {t.ultimoHs || 0} hs · {fmtDDMM(new Date(t.ultimaFecha + 'T00:00:00'))}</p>
+                        )}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
                           <div><label className="text-[10px] text-slate-500 mb-0.5 block">Cada (hs)</label>
-                            <input type="number" placeholder="250" value={t.cada || ''} onChange={e => setMant(i, 'cada', e.target.value)} className="text-sm w-full" /></div>
-                          <div><label className="text-[10px] text-slate-500 mb-0.5 block">Próximo a (hs)</label>
-                            <input type="number" placeholder="1400" value={t.proximo || ''} onChange={e => setMant(i, 'proximo', e.target.value)} className="text-sm w-full" /></div>
+                            <input type="number" placeholder="250" value={t.intervaloHs || ''} onChange={e => setTarea(motorSelIdx,i, 'intervaloHs', e.target.value)} className="text-sm w-full" /></div>
+                          <div><label className="text-[10px] text-slate-500 mb-0.5 block">Último a (hs)</label>
+                            <input type="number" placeholder="0" value={t.ultimoHs || ''} onChange={e => setTarea(motorSelIdx,i, 'ultimoHs', e.target.value)} className="text-sm w-full" /></div>
+                          <div><label className="text-[10px] text-slate-500 mb-0.5 block">Fecha último</label>
+                            <input type="date" value={t.ultimaFecha || ''} onChange={e => setTarea(motorSelIdx,i, 'ultimaFecha', e.target.value)} className="text-sm w-full" /></div>
                           <div><label className="text-[10px] text-slate-500 mb-0.5 block">Repuesto (cód.)</label>
-                            <input placeholder="P553000" value={t.codigo || ''} onChange={e => setMant(i, 'codigo', e.target.value.toUpperCase())} className="text-sm w-full font-mono" /></div>
+                            <input placeholder="P553000" value={t.codigo || ''} onChange={e => setTarea(motorSelIdx,i, 'codigo', e.target.value.toUpperCase())} className="text-sm w-full font-mono" /></div>
                         </div>
+                        {(t.historial?.length > 0) && (
+                          <div className="mt-2 border-t border-navy-700 pt-2">
+                            <button onClick={() => setHistAbierto(h => ({ ...h, [t.id]: !h[t.id] }))}
+                              className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-300">
+                              {histAbierto[t.id] ? <ChevronUp size={12} /> : <ChevronDown size={12} />} Historial ({t.historial.length})
+                            </button>
+                            {histAbierto[t.id] && (
+                              <div className="mt-1.5 space-y-1">
+                                {t.historial.map((h, hi) => ({ h, hi })).sort((a, b) => (a.h.fecha < b.h.fecha ? 1 : -1)).map(({ h, hi }) => (
+                                  <div key={hi} className="flex items-center gap-2 text-[11px] text-slate-400">
+                                    <span className="tabular-nums text-slate-300">{fmtDDMM(new Date(h.fecha + 'T00:00:00'))}</span>
+                                    <span className="text-slate-500">· {h.horas} hs</span>
+                                    {h.nota && <span className="text-slate-500 truncate">· {h.nota}</span>}
+                                    <button onClick={() => borrarHistorial(i, hi)} aria-label="Borrar entrada"
+                                      className="ml-auto text-slate-600 hover:text-red-400 flex-shrink-0"><Trash2 size={11} /></button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -969,6 +1221,56 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
                   ? '✓ Guardado'
                   : <><Save size={15} /> Guardar ficha técnica</>}
             </button>
+
+            {/* Modal: registrar un service */}
+            {registro && (
+              <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 px-4"
+                onClick={() => setRegistro(null)}>
+                <div className="bg-navy-800 border border-navy-600 rounded-2xl w-full max-w-sm p-5 space-y-3 mb-4 sm:mb-0"
+                  onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-white font-semibold text-sm">Registrar service</h3>
+                    <button onClick={() => setRegistro(null)} className="text-slate-500 hover:text-slate-300"><X size={16} /></button>
+                  </div>
+                  <p className="text-xs text-slate-500 -mt-1">{tareasMotor[registro.ti]?.nombre || 'Tarea'} · {motorAct.nombre}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><label className="text-[10px] text-slate-500 mb-0.5 block">Fecha</label>
+                      <input type="date" value={registro.fecha} onChange={e => setRegistro(r => ({ ...r, fecha: e.target.value }))} className="text-sm w-full" /></div>
+                    <div><label className="text-[10px] text-slate-500 mb-0.5 block">Horas del motor</label>
+                      <input type="number" value={registro.horas} onChange={e => setRegistro(r => ({ ...r, horas: e.target.value }))} className="text-sm w-full" /></div>
+                  </div>
+                  <div><label className="text-[10px] text-slate-500 mb-0.5 block">Nota (opcional)</label>
+                    <input value={registro.nota} onChange={e => setRegistro(r => ({ ...r, nota: e.target.value }))} placeholder="Ej: cambio de aceite y filtros" className="text-sm w-full" /></div>
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={() => setRegistro(null)} className="flex-1 btn-ghost py-2 text-sm rounded-lg">Cancelar</button>
+                    <button onClick={confirmarRegistro} className="flex-1 btn-primary py-2 text-sm">Registrar</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal: agregar motor extra */}
+            {addMotorOpen && (
+              <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 px-4"
+                onClick={() => setAddMotorOpen(false)}>
+                <div className="bg-navy-800 border border-navy-600 rounded-2xl w-full max-w-sm p-5 space-y-3 mb-4 sm:mb-0"
+                  onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-white font-semibold text-sm">Agregar motor</h3>
+                    <button onClick={() => setAddMotorOpen(false)} className="text-slate-500 hover:text-slate-300"><X size={16} /></button>
+                  </div>
+                  <p className="text-xs text-slate-500 -mt-1">Se crea como motor extra (aparece en la lista, no en el esquema).</p>
+                  <div><label className="text-[10px] text-slate-500 mb-0.5 block">Nombre</label>
+                    <input autoFocus value={nuevoNombre} onChange={e => setNuevoNombre(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') crearMotorExtra() }}
+                      placeholder="Ej: Bomba de achique, Generador…" className="text-sm w-full" /></div>
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={() => setAddMotorOpen(false)} className="flex-1 btn-ghost py-2 text-sm rounded-lg">Cancelar</button>
+                    <button onClick={crearMotorExtra} className="flex-1 btn-primary py-2 text-sm">Crear</button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1135,8 +1437,8 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
           </div>
         )}
 
-        {/* ===== VISTA ORDEN DE COMPRA ===== */}
-        {vista === 'pedido' && (
+        {/* ===== VISTA ORDEN DE COMPRA (segmento de Repuestos) ===== */}
+        {vista === 'stock' && segmentoRep === 'orden' && (
           <div>
             {pendientes.length === 0 ? (
               <div className="text-center py-16 px-8 text-slate-600 text-sm">
@@ -1223,7 +1525,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
 
       {/* Footer fijo */}
       <div className="flex-shrink-0 border-t border-navy-700 bg-navy-800 p-4">
-        {vista === 'stock' && (
+        {vista === 'stock' && segmentoRep === 'inventario' && (
           <div className="flex justify-between items-center gap-3 text-xs">
             <span className="text-slate-400">
               Total en stock: <span className="text-white font-semibold">{unidadesTotales} unidades</span> en <span className="text-white font-semibold">{repuestos.length} repuestos</span>
@@ -1245,7 +1547,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
             </span>
           </div>
         )}
-        {vista === 'pedido' && pendientes.length > 0 && (
+        {vista === 'stock' && segmentoRep === 'orden' && pendientes.length > 0 && (
           <div className="space-y-2.5">
             <p className="text-xs text-slate-400 text-center sm:text-left">
               <b className="text-white">{seleccionadosPedido.length}</b> repuesto{seleccionadosPedido.length === 1 ? '' : 's'} · <b className="text-white">{totalUnidadesPedido}</b> unidades a pedir · <b className="text-white">{provsPedido}</b> proveedor{provsPedido === 1 ? '' : 'es'}
