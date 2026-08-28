@@ -86,7 +86,9 @@ function fmtFechaPartes(iso) {
 // Arma el modelo de datos que consume el PDF a partir de las fuentes de la app.
 // `modo` = 'singladuras' | 'dias'. Sólo cambia la columna de cómputo y el TOTAL.
 export function construirDatosPlanilla({ periodo, libreta, perfil, fichaMotor, modo = 'singladuras' }) {
-  const potenciaKW = fichaMotor?.motorPrincipal?.potenciaKW || ''
+  // Potencia del motor principal: modelo nuevo (motores[]) con fallback al viejo.
+  const motorPpal = fichaMotor?.motores?.find(m => m.rol === 'principal') || fichaMotor?.motores?.[0]
+  const potenciaKW = motorPpal?.identificacion?.potenciaKw || fichaMotor?.motorPrincipal?.potenciaKW || ''
 
   const filas = periodo.viajes.map(v => ({
     puertoSalida: v.puertoPartida || '',
