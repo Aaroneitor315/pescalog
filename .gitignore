@@ -2,3 +2,17 @@ node_modules
 dist
 .env
 .env.local
+
+# Documentacion de tramites / marketing (fuera del repo)
+*.pdf
+*.zip
+/publicidad/
+
+# Scripts y previews locales de trabajo
+preview_*.html
+generar_*.py
+preparar_*.py
+
+# Config local del editor / Claude
+.claude/settings.local.json
+.claude/launch.json
