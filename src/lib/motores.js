@@ -22,6 +22,45 @@ export function horasActuales(m) {
   return base
 }
 
+// Horas del contador PARCIAL (reseteable) en vivo: base parcial + tiempo en marcha.
+export function horasParcialActual(m) {
+  const base = Number(m?.horasParcial) || 0
+  if (m?.marcha?.activo && m.marcha.desde) {
+    const t = Date.parse(m.marcha.desde)
+    if (!isNaN(t)) return base + Math.max(0, (Date.now() - t) / 3600000)
+  }
+  return base
+}
+
+// Clave de mes 'YYYY-MM' para acumular uso mensual.
+export function mesKey(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+// Serie de uso por mes para el gráfico: últimos `n` meses hasta hoy.
+// Devuelve [{ key, label, hs }] con el uso guardado en m.usoMensual (más el
+// tiempo en marcha imputado al mes en curso).
+const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+export function usoMensualSerie(m, n = 8) {
+  const uso = { ...(m?.usoMensual || {}) }
+  if (m?.marcha?.activo && m.marcha.desde) {
+    const t = Date.parse(m.marcha.desde)
+    if (!isNaN(t)) {
+      const k = mesKey()
+      uso[k] = (Number(uso[k]) || 0) + Math.max(0, (Date.now() - t) / 3600000)
+    }
+  }
+  const out = []
+  const base = new Date()
+  base.setDate(1)
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(base.getFullYear(), base.getMonth() - i, 1)
+    const key = mesKey(d)
+    out.push({ key, label: MESES[d.getMonth()], hs: Number(uso[key]) || 0 })
+  }
+  return out
+}
+
 // Estado de una tarea, calculado por horas.
 //   proximoHs = ultimoHs + intervaloHs
 //   faltanHs  = proximoHs - horasMotor

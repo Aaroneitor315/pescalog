@@ -6,8 +6,8 @@ import { getDoc, setDoc, doc } from 'firebase/firestore'
 import { storage, db } from '../firebase'
 import { useRepuestos } from '../hooks/useRepuestos'
 import StatusPill, { estadoStock, colorEstado } from './StatusPill'
-import SalaMaquinas from './SalaMaquinas'
-import { estadoTarea, estadoMotor, motorTieneAlerta, fechaEstimadaProximo, horasActuales } from '../lib/motores'
+import { estadoTarea, estadoMotor, motorTieneAlerta, fechaEstimadaProximo, horasActuales, horasParcialActual, mesKey, usoMensualSerie } from '../lib/motores'
+import MotorHero from './MotorHero'
 
 // Cada sección aporta su color de acento. Se expone como variables CSS
 // (--accent / --accent-soft / --accent-line) en la raíz del modal, así el resto
@@ -394,6 +394,8 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
   const [histAbierto, setHistAbierto] = useState({}) // { [tareaId]: bool }
   const [addMotorOpen, setAddMotorOpen] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState('')
+  const [fichaAbierta, setFichaAbierta] = useState(true) // ficha técnica colapsable
+  const mantenimientoRef = useRef(null)
   const [fichaMotorGuardando, setFichaMotorGuardando] = useState(false)
   const [fichaMotorGuardado, setFichaMotorGuardado] = useState(false)
 
@@ -563,11 +565,31 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     setFichaMotor(f => ({ ...f, motores }))
     setDoc(doc(db, 'usuarios', uid, 'fichas', 'maquinas'), { motores }, { merge: true }).catch(() => {})
   }
-  // Detiene el conteo: consolida las horas transcurridas en `horas` (base) y apaga marcha.
+  // Detiene el conteo: consolida el tiempo en el total, en el parcial y en el mes
+  // en curso (para el gráfico), y apaga la marcha.
   function detenerMotor(idx) {
     const lista = fichaMotor.motores || []
-    const motores = lista.map((m, j) => j === idx
-      ? { ...m, horas: String(Math.round(horasActuales(m))), marcha: { activo: false, desde: '' } } : m)
+    const motores = lista.map((m, j) => {
+      if (j !== idx) return m
+      const desde = Date.parse(m.marcha?.desde || '')
+      const transcurrido = !isNaN(desde) ? Math.max(0, (Date.now() - desde) / 3600000) : 0
+      const k = mesKey()
+      const usoMensual = { ...(m.usoMensual || {}), [k]: (Number(m.usoMensual?.[k]) || 0) + transcurrido }
+      return {
+        ...m,
+        horas: String(Math.round((Number(m.horas) || 0) + transcurrido)),
+        horasParcial: String(Math.round(((Number(m.horasParcial) || 0) + transcurrido) * 10) / 10),
+        usoMensual,
+        marcha: { activo: false, desde: '' },
+      }
+    })
+    setFichaMotor(f => ({ ...f, motores }))
+    setDoc(doc(db, 'usuarios', uid, 'fichas', 'maquinas'), { motores }, { merge: true }).catch(() => {})
+  }
+  // Reinicia solo el contador parcial (el total y el uso mensual no se tocan).
+  function reiniciarParcial(idx) {
+    const lista = fichaMotor.motores || []
+    const motores = lista.map((m, j) => j === idx ? { ...m, horasParcial: '0' } : m)
     setFichaMotor(f => ({ ...f, motores }))
     setDoc(doc(db, 'usuarios', uid, 'fichas', 'maquinas'), { motores }, { merge: true }).catch(() => {})
   }
@@ -748,6 +770,9 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
   const motorAct = motorSel
   const tareasMotor = motorAct.tareas || []
   const horasMotor = horasActuales(motorAct)
+  const horasParcial = horasParcialActual(motorAct)
+  const serieMensual = usoMensualSerie(motorAct, 8)
+  const maxMensual = Math.max(1, ...serieMensual.map(s => s.hs))
   const enMarcha = !!motorAct.marcha?.activo
   // Estado del motor seleccionado (helper compartido, siempre por horas).
   const emSel = estadoMotor(motorSel)
@@ -763,6 +788,12 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
   // "N alertas" = motores con al menos una tarea en 'proximo' o 'vencido'.
   const alertasMotor = motoresLista.filter(motorTieneAlerta).length
   const motoresExtra = motoresLista.filter(m => m.rol === 'extra')
+  // Motores distintos del seleccionado (van como tarjetas en la columna derecha).
+  const otrosMotores = motoresLista.filter(m => m.id !== motorSel.id)
+  // Slots auxiliares aún sin cargar (para "equipar" o marcar "no equipado").
+  const nAux = motoresLista.filter(m => m.rol === 'auxiliar').length
+  const slotsVacios = []
+  for (let i = nAux; i < 2; i++) slotsVacios.push(`auxiliar${i + 1}`)
 
   // Persiste la lista de motores en el acto (setDoc merge) además del estado.
   async function persistirMotores(nextMotores) {
@@ -1083,134 +1114,209 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
         {/* ===== VISTA FICHA MOTOR (solo maquinas) ===== */}
         {vista === 'ficha' && seccion === 'maquinas' && (
           <div className="p-4 space-y-4">
-            {/* HERO — esquema de la sala de máquinas (acotado en PC) */}
-            <div className="max-w-md mx-auto w-full">
-              <SalaMaquinas motores={motoresLista} seleccionado={motorSel.id} onSelect={setMotorSelId}
-                noEquipado={fichaMotor.noEquipado} onToggleNoEquipado={toggleNoEquipado} onEquipar={equiparAuxiliar} />
-            </div>
+            {/* Layout 2 columnas: hero + ficha técnica | otros motores + horas */}
+            <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-4">
 
-            {/* Motores extra (fuera del esquema) */}
-            {motoresExtra.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {motoresExtra.map(m => {
-                  const em = estadoMotor(m)
-                  const sel = m.id === motorSel.id
-                  return (
-                    <div key={m.id} onClick={() => setMotorSelId(m.id)}
-                      className="cursor-pointer rounded-xl border p-3 flex items-center gap-2.5 transition-colors"
-                      style={sel ? { borderColor: 'var(--accent)', background: 'var(--accent-soft)' } : { borderColor: '#1a304e', background: '#0d1829' }}>
-                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: em.color }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-white truncate">{m.nombre || 'Motor'}</p>
-                        <p className="text-[11px] text-slate-500">{Math.round(horasActuales(m)).toLocaleString('es-AR')} hs{m.marcha?.activo && <span className="text-emerald-400"> · en marcha</span>}</p>
+              {/* ── IZQUIERDA: hero + ficha técnica ── */}
+              <div className="space-y-3">
+                <MotorHero motor={motorAct} />
+
+                {/* Ficha técnica (colapsable) */}
+                <div className="bg-navy-800 border border-navy-700 rounded-xl">
+                  <button onClick={() => setFichaAbierta(v => !v)} className="w-full flex items-center justify-between px-4 py-3 text-left">
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-slate-500 uppercase tracking-widest">Ficha técnica</p>
+                      <p className="text-lg font-bold text-white leading-tight truncate">
+                        {motorAct.identificacion?.marca || '[Marca]'}
+                        <span className="text-sm text-slate-500 font-normal ml-2">{motorAct.identificacion?.modelo || '[Modelo]'}</span>
+                      </p>
+                    </div>
+                    {fichaAbierta ? <ChevronUp size={18} className="text-slate-500 flex-shrink-0" /> : <ChevronDown size={18} className="text-slate-500 flex-shrink-0" />}
+                  </button>
+                  {fichaAbierta && (
+                    <div className="px-4 pb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] text-slate-500">Nombre del motor</span>
+                        <input value={motorAct.nombre || ''} onChange={e => setMotorCampo(motorSelIdx, 'nombre', e.target.value)}
+                          placeholder="[Nombre]" className="text-[11px] text-slate-300 text-right placeholder-slate-600 max-w-[60%]"
+                          style={{ background: 'transparent', border: 'none', padding: 0 }} />
                       </div>
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
-                        style={{ color: em.color, background: `${em.color}1a`, border: `1px solid ${em.color}4d` }}>{em.label}</span>
-                      <button onClick={e => { e.stopPropagation(); eliminarMotorExtra(m.id) }} aria-label="Eliminar motor"
-                        className="w-11 h-11 sm:w-8 sm:h-8 rounded-lg border border-navy-600 hover:border-red-500/50 flex items-center justify-center flex-shrink-0"><Trash2 size={13} className="text-red-400" /></button>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { k: 'marca', label: 'Marca' },
+                          { k: 'modelo', label: 'Modelo' },
+                          { k: 'serie', label: 'N° de serie', mono: true },
+                          { k: 'potenciaKw', label: 'Potencia (kW)', type: 'number' },
+                          { k: 'anio', label: 'Año', type: 'number' },
+                          { k: 'combustible', label: 'Combustible' },
+                          { k: 'reductor', label: 'Reductor' },
+                          { k: 'relacion', label: 'Relación' },
+                        ].map(c => (
+                          <div key={c.k}>
+                            <label className="text-[10px] text-slate-500 mb-0.5 block">{c.label}</label>
+                            <input type={c.type || 'text'} placeholder={`[${c.label}]`}
+                              value={motorAct.identificacion?.[c.k] || ''}
+                              onChange={e => setMotorIdent(motorSelIdx, c.k, e.target.value)}
+                              className={`text-sm w-full placeholder-slate-600 ${c.mono ? 'font-mono' : ''}`} />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* Barra: estado del motor seleccionado + agregar */}
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: emSel.color }} />
-              <span className="text-sm font-semibold text-white truncate">{motorSel.nombre || 'Motor'}</span>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
-                style={{ color: emSel.color, background: `${emSel.color}1a`, border: `1px solid ${emSel.color}4d` }}>{emSel.label}</span>
-              <button onClick={() => { setNuevoNombre(''); setAddMotorOpen(true) }}
-                className="ml-auto flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0"
-                style={{ background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent-line)' }}>
-                <Plus size={14} /> Agregar motor
-              </button>
-            </div>
-
-            {/* Identificación + Horas de marcha */}
-            <div className="grid grid-cols-1 sm:grid-cols-[1.4fr_1fr] gap-3">
-              {/* Identificación */}
-              <div className="bg-navy-800 border border-navy-700 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] text-slate-500 uppercase tracking-widest">Identificación</p>
-                  <input value={motorAct.nombre || ''} onChange={e => setMotorCampo(motorSelIdx, 'nombre', e.target.value)}
-                    placeholder="[Nombre]" className="text-[11px] text-slate-400 text-right placeholder-slate-600 max-w-[55%]"
-                    style={{ background: 'transparent', border: 'none', padding: 0 }} />
-                </div>
-                <input value={motorAct.identificacion?.marca || ''} onChange={e => setMotorIdent(motorSelIdx,'marca', e.target.value)}
-                  placeholder="[Marca]" className="w-full text-lg font-bold text-white placeholder-slate-600" style={{ background: 'transparent', border: 'none', padding: 0 }} />
-                <input value={motorAct.identificacion?.modelo || ''} onChange={e => setMotorIdent(motorSelIdx,'modelo', e.target.value)}
-                  placeholder="[Modelo]" className="w-full text-sm text-slate-400 placeholder-slate-600" style={{ background: 'transparent', border: 'none', padding: 0 }} />
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
-                  {[
-                    { k: 'serie', label: 'N° de serie', mono: true },
-                    { k: 'potenciaKw', label: 'Potencia (kW)', type: 'number' },
-                    { k: 'anio', label: 'Año', type: 'number' },
-                    { k: 'combustible', label: 'Combustible' },
-                    { k: 'reductor', label: 'Reductor' },
-                    { k: 'relacion', label: 'Relación' },
-                  ].map(c => (
-                    <div key={c.k}>
-                      <label className="text-[10px] text-slate-500 mb-0.5 block">{c.label}</label>
-                      <input type={c.type || 'text'} placeholder={`[${c.label}]`}
-                        value={motorAct.identificacion?.[c.k] || ''}
-                        onChange={e => setMotorIdent(motorSelIdx,c.k, e.target.value)}
-                        className={`text-sm w-full placeholder-slate-600 ${c.mono ? 'font-mono' : ''}`} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Horas de marcha */}
-              <div className="bg-navy-800 border border-navy-700 rounded-xl p-4 flex flex-col">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-[10px] text-slate-500 uppercase tracking-widest">Horas de marcha</p>
-                  {enMarcha && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> En marcha
-                    </span>
                   )}
                 </div>
-                <div className="flex items-baseline gap-1">
+              </div>
+
+              {/* ── DERECHA: otros motores + horas de marcha ── */}
+              <div className="space-y-3">
+                {/* Otros motores del barco (selección) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-widest">Motores del barco</p>
+                    <button onClick={() => { setNuevoNombre(''); setAddMotorOpen(true) }}
+                      className="flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--accent)' }}>
+                      <Plus size={13} /> Agregar
+                    </button>
+                  </div>
+                  {otrosMotores.map(m => {
+                    const em = estadoMotor(m)
+                    const id = m.identificacion || {}
+                    return (
+                      <div key={m.id} onClick={() => setMotorSelId(m.id)}
+                        className="cursor-pointer rounded-xl border p-3 transition-colors hover:border-navy-500"
+                        style={{ borderColor: '#1a304e', background: '#0d1829' }}>
+                        <div className="flex items-center gap-2">
+                          <b className="text-sm text-white truncate">{m.nombre || 'Motor'}</b>
+                          <span className="text-xs text-slate-500">· {Math.round(horasActuales(m)).toLocaleString('es-AR')} hs</span>
+                          {m.marcha?.activo && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" title="En marcha" />}
+                          <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: em.color }}>
+                            <span className="w-2 h-2 rounded-full" style={{ background: em.color }} /> {em.label}
+                          </span>
+                          {m.rol === 'extra' && (
+                            <button onClick={e => { e.stopPropagation(); eliminarMotorExtra(m.id) }} aria-label="Eliminar motor"
+                              className="w-8 h-8 rounded-lg border border-navy-600 hover:border-red-500/50 flex items-center justify-center flex-shrink-0"><Trash2 size={12} className="text-red-400" /></button>
+                          )}
+                        </div>
+                        <div className="mt-2 flex gap-3">
+                          <div className="w-16 h-12 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(160deg,#1a2c42,#0c1826)', border: '1px solid #1a304e' }}>
+                            <svg width="42" height="30" viewBox="0 0 120 90" fill="none"><rect x="16" y="34" width="80" height="30" rx="4" fill="#33475d" stroke="#43586f" /><rect x="30" y="20" width="52" height="18" rx="3" fill="#3d556e" stroke="#43586f" /><circle cx="96" cy="49" r="14" fill="#2b3c4f" stroke="#43586f" /></svg>
+                          </div>
+                          <div className="flex-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px] content-center">
+                            <span className="text-slate-500">N° serie</span><span className="text-slate-300 text-right font-medium truncate">{id.serie || '—'}</span>
+                            <span className="text-slate-500">Año</span><span className="text-slate-300 text-right font-medium">{id.anio || '—'}</span>
+                            <span className="text-slate-500">Combustible</span><span className="text-slate-300 text-right font-medium truncate">{id.combustible || '—'}</span>
+                            <span className="text-slate-500">Potencia</span><span className="text-slate-300 text-right font-medium">{id.potenciaKw ? `${id.potenciaKw} kW` : '—'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {/* Slots auxiliares sin cargar */}
+                  {slotsVacios.map(rol => {
+                    const noEq = !!fichaMotor.noEquipado?.[rol]
+                    return (
+                      <div key={rol}
+                        className="rounded-xl border border-dashed p-3 flex items-center gap-2"
+                        style={{ borderColor: noEq ? '#1a304e' : 'var(--accent-line)', opacity: noEq ? 0.55 : 1 }}>
+                        <span className="text-sm font-semibold" style={{ color: noEq ? '#64748b' : 'var(--accent)' }}>
+                          {rol === 'auxiliar1' ? 'Auxiliar 1' : 'Auxiliar 2'}
+                        </span>
+                        <span className="text-xs text-slate-500">· {noEq ? 'No equipado' : 'sin cargar'}</span>
+                        {noEq ? (
+                          <button onClick={() => toggleNoEquipado(rol)} className="ml-auto text-xs font-semibold px-3 py-1.5 rounded-lg border border-navy-600 text-slate-300">Habilitar</button>
+                        ) : (
+                          <>
+                            <button onClick={() => toggleNoEquipado(rol)} className="ml-auto text-[11px] text-slate-500 underline">no equipado</button>
+                            <button onClick={equiparAuxiliar} className="text-xs font-semibold px-3 py-1.5 rounded-lg"
+                              style={{ background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent-line)' }}>Cargar</button>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Horas de marcha */}
+                <div className="bg-navy-800 border border-navy-700 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-widest">Horas de marcha</p>
+                    {enMarcha && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> En marcha
+                      </span>
+                    )}
+                  </div>
+                  {/* Total */}
+                  <div className="flex items-baseline gap-1">
+                    {enMarcha ? (
+                      <span className="text-4xl font-black text-white tabular-nums">
+                        {horasMotor.toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                      </span>
+                    ) : (
+                      <input type="number" value={motorAct.horas || ''} onChange={e => setMotorCampo(motorSelIdx, 'horas', e.target.value)}
+                        placeholder="0" className="text-4xl font-black text-white w-32 placeholder-slate-700" style={{ background: 'transparent', border: 'none', padding: 0 }} />
+                    )}
+                    <span className="text-sm text-slate-500">hs total</span>
+                  </div>
+                  {/* Parcial */}
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-sm font-bold text-slate-300 tabular-nums">
+                      {horasParcial.toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                    </span>
+                    <span className="text-[11px] text-slate-500">hs parcial</span>
+                    <button onClick={() => reiniciarParcial(motorSelIdx)} disabled={motorSelIdx < 0}
+                      className="ml-auto text-[11px] text-slate-500 hover:text-slate-300 underline disabled:opacity-40">Reiniciar parcial</button>
+                  </div>
+                  {/* Botón marcha */}
                   {enMarcha ? (
-                    <span className="text-3xl font-black text-white tabular-nums">
-                      {horasMotor.toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                    </span>
+                    <button onClick={() => detenerMotor(motorSelIdx)}
+                      className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold text-sm bg-red-500/15 border border-red-500/40 text-red-300 hover:bg-red-500/25 transition-colors">
+                      <Square size={14} /> Detener
+                    </button>
                   ) : (
-                    <input type="number" value={motorAct.horas || ''} onChange={e => setMotorCampo(motorSelIdx,'horas', e.target.value)}
-                      placeholder="0" className="text-3xl font-black text-white w-28 placeholder-slate-700" style={{ background: 'transparent', border: 'none', padding: 0 }} />
+                    <button onClick={() => arrancarMotor(motorSelIdx)} disabled={motorSelIdx < 0}
+                      className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold text-sm bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 transition-colors disabled:opacity-40">
+                      <Play size={14} /> En marcha
+                    </button>
                   )}
-                  <span className="text-sm text-slate-500">hs</span>
-                </div>
-                {enMarcha ? (
-                  <button onClick={() => detenerMotor(motorSelIdx)}
-                    className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold text-sm bg-red-500/15 border border-red-500/40 text-red-300 hover:bg-red-500/25 transition-colors">
-                    <Square size={14} /> Detener
-                  </button>
-                ) : (
-                  <button onClick={() => arrancarMotor(motorSelIdx)} disabled={motorSelIdx < 0}
-                    className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold text-sm bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 transition-colors disabled:opacity-40">
-                    <Play size={14} /> En marcha
-                  </button>
-                )}
-                {urgTarea ? (
-                  <>
-                    <div className="mt-3 h-2 rounded-full bg-navy-700 overflow-hidden">
-                      <div className="h-full rounded-full transition-all" style={{ width: `${progUrg * 100}%`, background: urgCerca ? emSel.color : 'var(--accent)' }} />
+                  {/* Gráfico de uso mensual */}
+                  <div className="mt-4 pt-3 border-t border-dashed border-navy-600">
+                    <div className="flex gap-1.5 h-24">
+                      {serieMensual.map(s => (
+                        <div key={s.key} className="flex-1 h-full flex flex-col justify-end" title={`${s.label}: ${Math.round(s.hs)} hs`}>
+                          <div className="rounded-t" style={{ height: `${Math.max(3, (s.hs / maxMensual) * 100)}%`, background: 'linear-gradient(180deg,var(--accent),#0e7490)' }} />
+                        </div>
+                      ))}
                     </div>
-                    <p className="text-[11px] mt-1.5 leading-snug" style={{ color: urgCerca ? emSel.color : '#64748b' }}>
-                      Próximo service: <b>{urgTarea.nombre || 'tarea'}</b> · {emSel.faltanMin >= 0 ? `faltan ${Math.round(emSel.faltanMin)} hs` : `vencido hace ${Math.round(-emSel.faltanMin)} hs`}
-                      {fEstUrg && <> · fecha est. {fmtDDMM(fEstUrg)}</>}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-[11px] mt-3 text-slate-600">Agregá tareas de mantenimiento para ver el próximo service.</p>
-                )}
+                    <div className="flex gap-1.5 mt-1">
+                      {serieMensual.map(s => <span key={s.key} className="flex-1 text-center text-[9px] text-slate-600">{s.label}</span>)}
+                    </div>
+                    <p className="text-[10px] text-slate-600 mt-1 text-center">Horas de uso por mes</p>
+                  </div>
+                  {/* Próximo service + configurar plan */}
+                  {urgTarea ? (
+                    <>
+                      <div className="mt-3 h-2 rounded-full bg-navy-700 overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${progUrg * 100}%`, background: urgCerca ? emSel.color : 'var(--accent)' }} />
+                      </div>
+                      <p className="text-[11px] mt-1.5 leading-snug" style={{ color: urgCerca ? emSel.color : '#64748b' }}>
+                        Próximo service: <b>{urgTarea.nombre || 'tarea'}</b> · {emSel.faltanMin >= 0 ? `faltan ${Math.round(emSel.faltanMin)} hs` : `vencido hace ${Math.round(-emSel.faltanMin)} hs`}
+                        {fEstUrg && <> · fecha est. {fmtDDMM(fEstUrg)}</>}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-[11px] mt-3 text-slate-600">Agregá tareas de mantenimiento para ver el próximo service.</p>
+                  )}
+                  <button onClick={() => mantenimientoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                    className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold text-sm"
+                    style={{ background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent-line)' }}>
+                    <ClipboardCheck size={14} /> Configurar plan de mantenimiento
+                  </button>
+                </div>
               </div>
             </div>
 
             {/* Mantenimiento programado */}
-            <div>
+            <div ref={mantenimientoRef} className="scroll-mt-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[10px] text-slate-500 uppercase tracking-widest">Mantenimiento programado</p>
                 <button onClick={() => addTarea(motorSelIdx)} className="text-xs flex items-center gap-1 hover:opacity-80" style={{ color: 'var(--accent)' }}>
