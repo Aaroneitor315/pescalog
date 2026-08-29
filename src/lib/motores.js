@@ -10,6 +10,18 @@ export const COLOR_ST = {
 
 const RANK = { al_dia: 0, proximo: 1, vencido: 2 }
 
+// Horas reales del motor = base guardada (m.horas) + tiempo transcurrido si está
+// "en marcha" (reloj de pared desde m.marcha.desde). Sobrevive a cerrar/recargar
+// la app porque se deriva del timestamp, no de un contador en memoria.
+export function horasActuales(m) {
+  const base = Number(m?.horas) || 0
+  if (m?.marcha?.activo && m.marcha.desde) {
+    const t = Date.parse(m.marcha.desde)
+    if (!isNaN(t)) return base + Math.max(0, (Date.now() - t) / 3600000)
+  }
+  return base
+}
+
 // Estado de una tarea, calculado por horas.
 //   proximoHs = ultimoHs + intervaloHs
 //   faltanHs  = proximoHs - horasMotor
@@ -35,7 +47,7 @@ export function estadoTarea(tarea, horasMotor) {
 // `peorTarea` = la tarea más urgente (menor faltanHs) para mostrar próximo service.
 export function estadoMotor(m) {
   if (!m) return { key: 'none', color: COLOR_ST.none, label: 'Sin cargar', peorTarea: null, faltanMin: Infinity }
-  const horas = Number(m.horas) || 0
+  const horas = horasActuales(m)
   let key = 'al_dia'
   let faltanMin = Infinity
   let peorTarea = null
@@ -53,7 +65,7 @@ export function estadoMotor(m) {
 
 // ¿El motor tiene al menos una tarea en 'proximo' o 'vencido'?
 export function motorTieneAlerta(m) {
-  const horas = Number(m?.horas) || 0
+  const horas = horasActuales(m)
   return (m?.tareas || []).some(t => {
     const e = estadoTarea(t, horas)
     return e.intervalo && (e.key === 'proximo' || e.key === 'vencido')

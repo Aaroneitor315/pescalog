@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Camera, Plus, Minus, Trash2, Wrench, Anchor, Loader, Pencil, Save, Search, AlertTriangle, Check, Copy, MessageCircle, Package, ClipboardCheck, ChevronDown, ChevronUp } from 'lucide-react'
+import { X, Camera, Plus, Minus, Trash2, Wrench, Anchor, Loader, Pencil, Save, Search, AlertTriangle, Check, Copy, MessageCircle, Package, ClipboardCheck, ChevronDown, ChevronUp, Play, Square } from 'lucide-react'
 import { createWorker } from 'tesseract.js'
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import { getDoc, setDoc, doc } from 'firebase/firestore'
@@ -7,7 +7,7 @@ import { storage, db } from '../firebase'
 import { useRepuestos } from '../hooks/useRepuestos'
 import StatusPill, { estadoStock, colorEstado } from './StatusPill'
 import SalaMaquinas from './SalaMaquinas'
-import { estadoTarea, estadoMotor, motorTieneAlerta, fechaEstimadaProximo } from '../lib/motores'
+import { estadoTarea, estadoMotor, motorTieneAlerta, fechaEstimadaProximo, horasActuales } from '../lib/motores'
 
 // Cada sección aporta su color de acento. Se expone como variables CSS
 // (--accent / --accent-soft / --accent-line) en la raíz del modal, así el resto
@@ -435,6 +435,16 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     }
   }, [uid, seccion])
 
+  // Tick en vivo: mientras haya algún motor "en marcha", re-renderiza cada 30 s
+  // para ver subir el contador de horas (no persiste; se recalcula desde el timestamp).
+  const [, setTick] = useState(0)
+  const hayMarcha = (fichaMotor.motores || []).some(m => m.marcha?.activo)
+  useEffect(() => {
+    if (!hayMarcha) return
+    const id = setInterval(() => setTick(t => t + 1), 30000)
+    return () => clearInterval(id)
+  }, [hayMarcha])
+
   async function guardarFichaMotor() {
     setFichaMotorGuardando(true)
     try {
@@ -545,7 +555,22 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     setDoc(doc(db, 'usuarios', uid, 'fichas', 'maquinas'), { motores, noEquipado }, { merge: true }).catch(() => {})
     setMotorSelId(nuevo.id)
   }
-
+  // Arranca el conteo "en marcha" del motor idx (guarda el timestamp de inicio).
+  function arrancarMotor(idx) {
+    const lista = fichaMotor.motores || []
+    const motores = lista.map((m, j) => j === idx
+      ? { ...m, marcha: { activo: true, desde: new Date().toISOString() } } : m)
+    setFichaMotor(f => ({ ...f, motores }))
+    setDoc(doc(db, 'usuarios', uid, 'fichas', 'maquinas'), { motores }, { merge: true }).catch(() => {})
+  }
+  // Detiene el conteo: consolida las horas transcurridas en `horas` (base) y apaga marcha.
+  function detenerMotor(idx) {
+    const lista = fichaMotor.motores || []
+    const motores = lista.map((m, j) => j === idx
+      ? { ...m, horas: String(Math.round(horasActuales(m))), marcha: { activo: false, desde: '' } } : m)
+    setFichaMotor(f => ({ ...f, motores }))
+    setDoc(doc(db, 'usuarios', uid, 'fichas', 'maquinas'), { motores }, { merge: true }).catch(() => {})
+  }
 
   function abrirEdicion(r) {
     setEditandoId(r.id)
@@ -722,7 +747,8 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
   const motorSelIdx = motoresLista.findIndex(m => m.id === motorSel.id) // -1 si lista vacía
   const motorAct = motorSel
   const tareasMotor = motorAct.tareas || []
-  const horasMotor = Number(motorAct.horas) || 0
+  const horasMotor = horasActuales(motorAct)
+  const enMarcha = !!motorAct.marcha?.activo
   // Estado del motor seleccionado (helper compartido, siempre por horas).
   const emSel = estadoMotor(motorSel)
   const urgTarea = emSel.peorTarea       // tarea que marca el próximo service
@@ -1076,7 +1102,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
                       <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: em.color }} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-white truncate">{m.nombre || 'Motor'}</p>
-                        <p className="text-[11px] text-slate-500">{(Number(m.horas) || 0).toLocaleString('es-AR')} hs</p>
+                        <p className="text-[11px] text-slate-500">{Math.round(horasActuales(m)).toLocaleString('es-AR')} hs{m.marcha?.activo && <span className="text-emerald-400"> · en marcha</span>}</p>
                       </div>
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
                         style={{ color: em.color, background: `${em.color}1a`, border: `1px solid ${em.color}4d` }}>{em.label}</span>
@@ -1137,12 +1163,36 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
 
               {/* Horas de marcha */}
               <div className="bg-navy-800 border border-navy-700 rounded-xl p-4 flex flex-col">
-                <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Horas de marcha</p>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-widest">Horas de marcha</p>
+                  {enMarcha && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> En marcha
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-baseline gap-1">
-                  <input type="number" value={motorAct.horas || ''} onChange={e => setMotorCampo(motorSelIdx,'horas', e.target.value)}
-                    placeholder="0" className="text-3xl font-black text-white w-28 placeholder-slate-700" style={{ background: 'transparent', border: 'none', padding: 0 }} />
+                  {enMarcha ? (
+                    <span className="text-3xl font-black text-white tabular-nums">
+                      {horasMotor.toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                    </span>
+                  ) : (
+                    <input type="number" value={motorAct.horas || ''} onChange={e => setMotorCampo(motorSelIdx,'horas', e.target.value)}
+                      placeholder="0" className="text-3xl font-black text-white w-28 placeholder-slate-700" style={{ background: 'transparent', border: 'none', padding: 0 }} />
+                  )}
                   <span className="text-sm text-slate-500">hs</span>
                 </div>
+                {enMarcha ? (
+                  <button onClick={() => detenerMotor(motorSelIdx)}
+                    className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold text-sm bg-red-500/15 border border-red-500/40 text-red-300 hover:bg-red-500/25 transition-colors">
+                    <Square size={14} /> Detener
+                  </button>
+                ) : (
+                  <button onClick={() => arrancarMotor(motorSelIdx)} disabled={motorSelIdx < 0}
+                    className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold text-sm bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 transition-colors disabled:opacity-40">
+                    <Play size={14} /> En marcha
+                  </button>
+                )}
                 {urgTarea ? (
                   <>
                     <div className="mt-3 h-2 rounded-full bg-navy-700 overflow-hidden">
