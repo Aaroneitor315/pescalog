@@ -44,7 +44,7 @@ function EngineAcero({ s, grande }) {
   )
 }
 
-export default function SalaMaquinas({ motores = [], seleccionado, onSelect, noEquipado = {}, onToggleNoEquipado }) {
+export default function SalaMaquinas({ motores = [], seleccionado, onSelect, noEquipado = {}, onToggleNoEquipado, onEquipar }) {
   const principal = motores.find(m => m.rol === 'principal') || motores[0]
   const aux = motores.filter(m => m.rol === 'auxiliar')
   const bySlot = { principal, auxiliar1: aux[0], auxiliar2: aux[1] }
@@ -58,7 +58,8 @@ export default function SalaMaquinas({ motores = [], seleccionado, onSelect, noE
       {SLOTS.map(s => {
         const m = bySlot[s.rol]
         const noEq = !m && !!noEquipado[s.rol]
-        const est = m ? estadoMotor(m) : { color: '#475569', label: noEq ? 'No equipado' : 'Sin cargar' }
+        const est = m ? estadoMotor(m)
+          : { color: noEq ? '#475569' : '#22d3ee', label: noEq ? 'No equipado' : 'Tocar para cargar' }
         const grande = s.rol === 'principal'
         const op = m ? 1 : (noEq ? 0.28 : 0.5)
         return (
@@ -75,18 +76,33 @@ export default function SalaMaquinas({ motores = [], seleccionado, onSelect, noE
               {/* textos */}
               <text x={s.x + 15} y={s.y + 32} fontSize={grande ? 13 : 12} fontWeight="700" fill="#f1f5f9">{m?.nombre || s.def}</text>
               <text x={s.x + 15} y={s.y + 49} fontSize="11" fill="#94a3b8">{m ? fmtHoras(m.horas) : '—'}</text>
-              <text x={s.x + 15} y={s.y + 65} fontSize="10.5" fontWeight="600" style={{ fill: m ? 'var(--st)' : '#64748b' }}>{est.label}</text>
+              <text x={s.x + 15} y={s.y + 65} fontSize="10.5" fontWeight="600" style={{ fill: m ? 'var(--st)' : est.color }}>{est.label}</text>
             </g>
-            {/* zona clicable: motor → seleccionar; aux vacío → marcar (no) equipado */}
+            {/* zona clicable: motor → seleccionar; aux vacío → cargar (equipar); link "no equipado" */}
             {m ? (
               <rect className="hit" x={s.x + 4} y={s.y + 4} width={s.w - 8} height={s.h - 8} rx="10"
                 fill="transparent" style={{ cursor: 'pointer' }} onClick={() => onSelect && onSelect(m.id)} />
-            ) : (s.rol !== 'principal' && onToggleNoEquipado && (
+            ) : (s.rol !== 'principal' && (noEq ? (
+              // no equipado → tocar habilita el slot (vuelve a "sin cargar")
               <rect className="hit" x={s.x + 4} y={s.y + 4} width={s.w - 8} height={s.h - 8} rx="10"
-                fill="transparent" style={{ cursor: 'pointer' }} onClick={() => onToggleNoEquipado(s.rol)}>
-                <title>{noEq ? 'Tocar para marcar como equipado' : 'Tocar para marcar como no equipado'}</title>
+                fill="transparent" style={{ cursor: 'pointer' }} onClick={() => onToggleNoEquipado && onToggleNoEquipado(s.rol)}>
+                <title>Tocar para habilitar este motor</title>
               </rect>
-            ))}
+            ) : (
+              <>
+                {/* cuerpo → cargar el motor auxiliar */}
+                <rect className="hit" x={s.x + 4} y={s.y + 4} width={s.w - 8} height={s.h - 8} rx="10"
+                  fill="transparent" style={{ cursor: 'pointer' }} onClick={() => onEquipar && onEquipar(s.rol)}>
+                  <title>Tocar para cargar este motor</title>
+                </rect>
+                {/* link chico: marcar como no equipado */}
+                {onToggleNoEquipado && (
+                  <text x={s.x + s.w - 12} y={s.y + s.h - 11} textAnchor="end" fontSize="9.5"
+                    fill="#64748b" style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                    onClick={(e) => { e.stopPropagation(); onToggleNoEquipado(s.rol) }}>no equipado</text>
+                )}
+              </>
+            )))}
           </g>
         )
       })}

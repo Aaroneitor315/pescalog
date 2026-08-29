@@ -530,6 +530,21 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     setFichaMotor(f => ({ ...f, noEquipado }))
     setDoc(doc(db, 'usuarios', uid, 'fichas', 'maquinas'), { noEquipado }, { merge: true }).catch(() => {})
   }
+  // "Equipar" un slot auxiliar vacío: crea el motor auxiliar (siguiente en orden),
+  // limpia el flag "no equipado" de ese slot y lo deja seleccionado para cargarlo.
+  function equiparAuxiliar() {
+    const lista = fichaMotor.motores || []
+    const nAux = lista.filter(m => m.rol === 'auxiliar').length
+    if (nAux >= 2) return
+    const nuevo = motorVacio('auxiliar', `Auxiliar ${nAux + 1}`)
+    const slotKey = `auxiliar${nAux + 1}`
+    const noEquipado = { ...(fichaMotor.noEquipado || {}) }
+    delete noEquipado[slotKey]
+    const motores = [...lista, nuevo]
+    setFichaMotor(f => ({ ...f, motores, noEquipado }))
+    setDoc(doc(db, 'usuarios', uid, 'fichas', 'maquinas'), { motores, noEquipado }, { merge: true }).catch(() => {})
+    setMotorSelId(nuevo.id)
+  }
 
 
   function abrirEdicion(r) {
@@ -1042,9 +1057,11 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
         {/* ===== VISTA FICHA MOTOR (solo maquinas) ===== */}
         {vista === 'ficha' && seccion === 'maquinas' && (
           <div className="p-4 space-y-4">
-            {/* HERO — esquema de la sala de máquinas */}
-            <SalaMaquinas motores={motoresLista} seleccionado={motorSel.id} onSelect={setMotorSelId}
-              noEquipado={fichaMotor.noEquipado} onToggleNoEquipado={toggleNoEquipado} />
+            {/* HERO — esquema de la sala de máquinas (acotado en PC) */}
+            <div className="max-w-md mx-auto w-full">
+              <SalaMaquinas motores={motoresLista} seleccionado={motorSel.id} onSelect={setMotorSelId}
+                noEquipado={fichaMotor.noEquipado} onToggleNoEquipado={toggleNoEquipado} onEquipar={equiparAuxiliar} />
+            </div>
 
             {/* Motores extra (fuera del esquema) */}
             {motoresExtra.length > 0 && (
