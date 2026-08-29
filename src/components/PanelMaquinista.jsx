@@ -446,13 +446,13 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
     }
   }, [uid, seccion])
 
-  // Tick en vivo: mientras haya algún motor "en marcha", re-renderiza cada 30 s
-  // para ver subir el contador de horas (no persiste; se recalcula desde el timestamp).
+  // Tick en vivo: mientras haya algún motor "en marcha", re-renderiza cada 1 s
+  // para ver correr el cronómetro (no persiste; todo se recalcula desde el timestamp).
   const [, setTick] = useState(0)
   const hayMarcha = (fichaMotor.motores || []).some(m => m.marcha?.activo)
   useEffect(() => {
     if (!hayMarcha) return
-    const id = setInterval(() => setTick(t => t + 1), 30000)
+    const id = setInterval(() => setTick(t => t + 1), 1000)
     return () => clearInterval(id)
   }, [hayMarcha])
 
@@ -783,6 +783,13 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
   const serieMensual = usoMensualSerie(motorAct, 8)
   const maxMensual = Math.max(1, ...serieMensual.map(s => s.hs))
   const enMarcha = !!motorAct.marcha?.activo
+  // Cronómetro de la sesión en curso (para que se vea correr en vivo).
+  const sesionMs = enMarcha ? Math.max(0, Date.now() - Date.parse(motorAct.marcha.desde || '')) : 0
+  const fmtDur = (ms) => {
+    const s = Math.floor(ms / 1000)
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
+    return h > 0 ? `${h}h ${String(m).padStart(2, '0')}m ${String(sec).padStart(2, '0')}s` : `${m}m ${String(sec).padStart(2, '0')}s`
+  }
   // Estado del motor seleccionado (helper compartido, siempre por horas).
   const emSel = estadoMotor(motorSel)
   const urgTarea = emSel.peorTarea       // tarea que marca el próximo service
@@ -1249,8 +1256,8 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-[10px] text-slate-500 uppercase tracking-widest">Horas de marcha</p>
                     {enMarcha && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> En marcha
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400 tabular-nums">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> En marcha · {fmtDur(sesionMs)}
                       </span>
                     )}
                   </div>
@@ -1284,7 +1291,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
                   ) : (
                     <button onClick={() => arrancarMotor(motorSelIdx)} disabled={motorSelIdx < 0}
                       className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold text-sm bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 transition-colors disabled:opacity-40">
-                      <Play size={14} /> En marcha
+                      <Play size={14} /> Iniciar marcha
                     </button>
                   )}
                   {/* Gráfico de uso mensual */}
