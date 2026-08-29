@@ -4,7 +4,7 @@
 // etiquetas se ocultan (los datos ya están en la ficha técnica debajo).
 import { estadoMotor } from '../lib/motores'
 
-export default function MotorHero({ motor }) {
+export default function MotorHero({ motor, foto }) {
   const ident = motor?.identificacion || {}
   const est = estadoMotor(motor)
   const nombre = motor?.nombre || 'Motor'
@@ -45,6 +45,12 @@ export default function MotorHero({ motor }) {
         </div>
       ))}
 
+      {foto ? (
+        <div className="px-2 pt-8 pb-3 flex items-center justify-center" style={{ minHeight: 200 }}>
+          <img src={foto} alt={`Motor ${nombre}`} className="w-[78%] max-w-[420px] h-auto"
+            style={{ filter: 'drop-shadow(0 12px 24px rgba(0,0,0,.5))' }} />
+        </div>
+      ) : (
       <div className="px-2 pt-2 pb-1">
         <svg viewBox="0 0 560 300" width="100%" style={{ display: 'block', height: 'auto' }}
           role="img" aria-label={`Motor ${nombre}`}>
@@ -88,6 +94,7 @@ export default function MotorHero({ motor }) {
           <rect x="60" y="63" width="440" height="147" fill="url(#mh-rim)" />
         </svg>
       </div>
+      )}
     </div>
   )
 }

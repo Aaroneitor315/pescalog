@@ -184,6 +184,15 @@ const IDENT_VACIA = { marca: '', modelo: '', serie: '', potenciaKw: '', anio: ''
 function motorVacio(rol = 'principal', nombre = 'Motor principal') {
   return { id: nuevoId(), rol, nombre, identificacion: { ...IDENT_VACIA }, horas: '', tareas: [] }
 }
+// Imagen del motor según su rol (renders genéricos en public/motores/).
+const FOTO_PRINCIPAL = '/motores/motor_principal.png'
+const FOTO_AUX = ['/motores/motor_aux1.png', '/motores/motor_aux2.png']
+function fotoDeMotor(m, lista) {
+  if (!m) return null
+  if (m.rol === 'principal') return FOTO_PRINCIPAL
+  const i = (lista || []).filter(x => x.rol === 'auxiliar').indexOf(m)
+  return FOTO_AUX[i] || FOTO_AUX[0]
+}
 // Convierte la ficha vieja (motor único) en lista de motores. Idempotente:
 // si ya hay `motores`, la devuelve sin tocar.
 function migrarAMotores(data) {
@@ -1119,7 +1128,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
 
               {/* ── IZQUIERDA: hero + ficha técnica ── */}
               <div className="space-y-3">
-                <MotorHero motor={motorAct} />
+                <MotorHero motor={motorAct} foto={fotoDeMotor(motorAct, motoresLista)} />
 
                 {/* Ficha técnica (colapsable) */}
                 <div className="bg-navy-800 border border-navy-700 rounded-xl">
@@ -1197,8 +1206,8 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
                           )}
                         </div>
                         <div className="mt-2 flex gap-3">
-                          <div className="w-16 h-12 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(160deg,#1a2c42,#0c1826)', border: '1px solid #1a304e' }}>
-                            <svg width="42" height="30" viewBox="0 0 120 90" fill="none"><rect x="16" y="34" width="80" height="30" rx="4" fill="#33475d" stroke="#43586f" /><rect x="30" y="20" width="52" height="18" rx="3" fill="#3d556e" stroke="#43586f" /><circle cx="96" cy="49" r="14" fill="#2b3c4f" stroke="#43586f" /></svg>
+                          <div className="w-20 h-14 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden" style={{ background: 'linear-gradient(160deg,#1a2c42,#0c1826)', border: '1px solid #1a304e' }}>
+                            <img src={fotoDeMotor(m, motoresLista)} alt="" className="w-full h-full object-contain p-0.5" />
                           </div>
                           <div className="flex-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px] content-center">
                             <span className="text-slate-500">N° serie</span><span className="text-slate-300 text-right font-medium truncate">{id.serie || '—'}</span>
