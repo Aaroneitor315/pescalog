@@ -257,7 +257,7 @@ function NovedadesHero({ onAbrirNoticias, onAbrirCursos, onAbrirBuzon, mensajesN
   return (
     <div>
       <p className="text-[10px] text-slate-600 uppercase tracking-widest font-semibold mb-2.5 px-0.5">Novedades y comunidad</p>
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
         {NOVEDADES_INFO.map(n => (
           <NovedadCard key={n.id} n={n} onClick={handlers[n.id]} badge={n.id === 'buzon' ? mensajesNuevos : 0} />
         ))}
