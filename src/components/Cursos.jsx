@@ -165,17 +165,27 @@ export default function Cursos({ esAdmin = false, onVolver }) {
               <div><label className="text-[10px] text-slate-500 mb-0.5 block">Dónde</label>
                 <input value={editor.donde} onChange={e => set('donde', e.target.value)} placeholder="Puerto Madryn" className="text-sm w-full" /></div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><label className="text-[10px] text-slate-500 mb-0.5 block">Modalidad</label>
-                <select value={editor.modalidad} onChange={e => set('modalidad', e.target.value)} className="text-sm w-full">
-                  <option value="presencial">Presencial</option>
-                  <option value="online">Online</option>
-                </select></div>
-              <div><label className="text-[10px] text-slate-500 mb-0.5 block">Tipo</label>
-                <select value={editor.tipo} onChange={e => set('tipo', e.target.value)} className="text-sm w-full">
-                  <option value="obligatorio">Obligatorio</option>
-                  <option value="recomendado">Recomendado</option>
-                </select></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] text-slate-500 mb-1 block">Modalidad</label>
+                <div className="grid grid-cols-2 gap-1 bg-navy-900 border border-navy-700 rounded-lg p-1">
+                  {[['presencial', 'Presencial'], ['online', 'Online']].map(([v, l]) => (
+                    <button key={v} type="button" onClick={() => set('modalidad', v)}
+                      className="py-1.5 rounded-md text-xs font-semibold transition-colors"
+                      style={editor.modalidad === v ? { background: 'var(--accent)', color: '#07131f' } : { color: '#94a3b8' }}>{l}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-500 mb-1 block">Tipo</label>
+                <div className="grid grid-cols-2 gap-1 bg-navy-900 border border-navy-700 rounded-lg p-1">
+                  {[['obligatorio', 'Obligatorio'], ['recomendado', 'Recomendado']].map(([v, l]) => (
+                    <button key={v} type="button" onClick={() => set('tipo', v)}
+                      className="py-1.5 rounded-md text-xs font-semibold transition-colors"
+                      style={editor.tipo === v ? { background: 'var(--accent)', color: '#07131f' } : { color: '#94a3b8' }}>{l}</button>
+                  ))}
+                </div>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div><label className="text-[10px] text-slate-500 mb-0.5 block">Vence (obligatorios)</label>

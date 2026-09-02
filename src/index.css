@@ -3,6 +3,15 @@
 @tailwind utilities;
 
 @layer base {
+  /* Acento por defecto (cyan). El modal de sectores lo overridea por sector.
+     Definirlo en :root hace que var(--accent) funcione en toda la app
+     (Noticias, Cursos, Buzón, etc.), no solo dentro de ese modal. */
+  :root {
+    --accent: #22d3ee;
+    --accent-soft: rgba(34, 211, 238, 0.10);
+    --accent-line: rgba(34, 211, 238, 0.30);
+  }
+
   body {
     @apply bg-navy-900 text-slate-100 min-h-screen;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
