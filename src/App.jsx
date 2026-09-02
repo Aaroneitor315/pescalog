@@ -136,7 +136,7 @@ export default function App() {
             mensajesNuevos={mensajesNuevos}
           />
         )}
-        {tab === 'noticias' && <Noticias esAdmin={admin} onVolver={() => setTab('dashboard')} />}
+        {tab === 'noticias' && <Noticias esAdmin={admin} uid={uid} onVolver={() => setTab('dashboard')} />}
         {tab === 'cursos' && <Cursos esAdmin={admin} onVolver={() => setTab('dashboard')} />}
         {tab === 'historial' && (
           <HistorialViajes

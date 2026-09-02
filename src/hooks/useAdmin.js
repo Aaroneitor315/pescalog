@@ -1,11 +1,24 @@
 import { useState, useEffect } from 'react'
 import { doc, onSnapshot, setDoc, collection, getDocs } from 'firebase/firestore'
 import { db } from '../firebase'
+import { useAuth } from './useAuth'
 
 export const ADMIN_EMAIL = 'alangambacorta7@gmail.com'
+// Allowlist de admins. Se puede sumar por email o por UID. Mantener en sync con
+// la función isAdmin() de firestore.rules (fuente de verdad del control real).
+export const ADMIN_EMAILS = [ADMIN_EMAIL]
+export const ADMIN_UIDS = []
 
 export function esAdmin(user) {
-  return user?.email === ADMIN_EMAIL
+  if (!user) return false
+  return ADMIN_EMAILS.includes(user.email) || ADMIN_UIDS.includes(user.uid)
+}
+
+// Hook: devuelve si el usuario logueado es admin (para gatear botones/UI).
+// El control real vive en firestore.rules; este gate es cosmético.
+export function useIsAdmin() {
+  const { user } = useAuth()
+  return esAdmin(user)
 }
 
 const SPONSORS_DEFAULT = {

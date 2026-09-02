@@ -1,8 +1,14 @@
 import { useState } from 'react'
 import { X, Star, Send, Mail, Archive, Check, Inbox, MessageSquare } from 'lucide-react'
 
-const TIPOS = ['Reseña', 'Sugerencia', 'Problema']
-const COLOR_TIPO = { 'Reseña': '#fbbf24', 'Sugerencia': '#22d3ee', 'Problema': '#f87171' }
+// tipo se guarda en minúscula ('reseña'|'sugerencia'|'problema'); el label es solo visual.
+const TIPOS = [
+  { v: 'reseña', label: 'Reseña' },
+  { v: 'sugerencia', label: 'Sugerencia' },
+  { v: 'problema', label: 'Problema' },
+]
+const LABEL_TIPO = { 'reseña': 'Reseña', 'sugerencia': 'Sugerencia', 'problema': 'Problema' }
+const COLOR_TIPO = { 'reseña': '#fbbf24', 'sugerencia': '#22d3ee', 'problema': '#f87171' }
 const COLOR_ESTADO = { nuevo: '#34d399', leido: '#64748b', archivado: '#475569' }
 const LABEL_ESTADO = { nuevo: 'Nuevo', leido: 'Leído', archivado: 'Archivado' }
 
@@ -30,17 +36,17 @@ function Shell({ title, icon: Icon, onCerrar, children }) {
 
 // ── Formulario (usuario logueado) ──────────────────────────────────────────
 function Formulario({ user, enviar, onCerrar }) {
-  const [tipo, setTipo] = useState('Reseña')
-  const [mensaje, setMensaje] = useState('')
+  const [tipo, setTipo] = useState('reseña')
+  const [texto, setTexto] = useState('')
   const [estrellas, setEstrellas] = useState(5)
   const [enviando, setEnviando] = useState(false)
   const [ok, setOk] = useState(false)
 
   async function submit() {
-    if (!mensaje.trim()) return
+    if (!texto.trim()) return
     setEnviando(true)
     try {
-      await enviar({ tipo, mensaje: mensaje.trim(), ...(tipo === 'Reseña' ? { estrellas } : {}) })
+      await enviar({ tipo, texto: texto.trim(), ...(tipo === 'reseña' ? { estrellas } : {}) })
       setOk(true)
     } finally { setEnviando(false) }
   }
@@ -64,18 +70,18 @@ function Formulario({ user, enviar, onCerrar }) {
         <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1.5 block">Tipo</label>
         <div className="grid grid-cols-3 gap-2">
           {TIPOS.map(t => (
-            <button key={t} onClick={() => setTipo(t)}
+            <button key={t.v} onClick={() => setTipo(t.v)}
               className="py-2.5 rounded-lg text-sm font-semibold transition-colors"
-              style={tipo === t
-                ? { background: `${COLOR_TIPO[t]}1f`, color: COLOR_TIPO[t], border: `1px solid ${COLOR_TIPO[t]}66` }
+              style={tipo === t.v
+                ? { background: `${COLOR_TIPO[t.v]}1f`, color: COLOR_TIPO[t.v], border: `1px solid ${COLOR_TIPO[t.v]}66` }
                 : { background: '#0d1829', color: '#94a3b8', border: '1px solid #1a304e' }}>
-              {t}
+              {t.label}
             </button>
           ))}
         </div>
       </div>
 
-      {tipo === 'Reseña' && (
+      {tipo === 'reseña' && (
         <div>
           <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1.5 block">Puntuación</label>
           <div className="flex gap-1.5">
@@ -90,7 +96,7 @@ function Formulario({ user, enviar, onCerrar }) {
 
       <div>
         <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1.5 block">Mensaje</label>
-        <textarea rows={5} value={mensaje} onChange={e => setMensaje(e.target.value)} placeholder="Escribí acá…" className="text-sm w-full resize-y" />
+        <textarea rows={5} value={texto} onChange={e => setTexto(e.target.value)} placeholder="Escribí acá…" className="text-sm w-full resize-y" />
       </div>
 
       <div className="text-[11px] text-slate-500 bg-navy-800 border border-navy-700 rounded-lg px-3 py-2">
@@ -99,7 +105,7 @@ function Formulario({ user, enviar, onCerrar }) {
 
       <div className="flex gap-2">
         <button onClick={onCerrar} className="flex-1 btn-ghost py-2.5 text-sm rounded-lg">Cancelar</button>
-        <button onClick={submit} disabled={enviando || !mensaje.trim()} className="flex-1 btn-primary py-2.5 text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+        <button onClick={submit} disabled={enviando || !texto.trim()} className="flex-1 btn-primary py-2.5 text-sm flex items-center justify-center gap-2 disabled:opacity-50">
           <Send size={15} /> {enviando ? 'Enviando…' : 'Enviar'}
         </button>
       </div>
@@ -121,7 +127,7 @@ function Bandeja({ mensajes, actualizarEstado }) {
       <div className="flex flex-wrap gap-2">
         <select value={fTipo} onChange={e => setFTipo(e.target.value)} className="text-sm py-1.5">
           <option value="todos">Todos los tipos</option>
-          {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
+          {TIPOS.map(t => <option key={t.v} value={t.v}>{t.label}</option>)}
         </select>
         <select value={fEstado} onChange={e => setFEstado(e.target.value)} className="text-sm py-1.5">
           <option value="todos">Todos los estados</option>
@@ -139,11 +145,12 @@ function Bandeja({ mensajes, actualizarEstado }) {
         </div>
       ) : lista.map(m => {
         const estado = m.estado || 'nuevo'
+        const colTipo = COLOR_TIPO[m.tipo] || '#94a3b8'
         return (
           <div key={m.id} className="bg-navy-800 border border-navy-700 rounded-xl p-3.5">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: `${COLOR_TIPO[m.tipo]}1a`, color: COLOR_TIPO[m.tipo], border: `1px solid ${COLOR_TIPO[m.tipo]}4d` }}>{m.tipo}</span>
-              {m.tipo === 'Reseña' && typeof m.estrellas === 'number' && (
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: `${colTipo}1a`, color: colTipo, border: `1px solid ${colTipo}4d` }}>{LABEL_TIPO[m.tipo] || m.tipo}</span>
+              {m.tipo === 'reseña' && typeof m.estrellas === 'number' && (
                 <span className="inline-flex items-center gap-0.5">
                   {[1, 2, 3, 4, 5].map(n => <Star key={n} size={13} className={n <= m.estrellas ? 'text-amber-400 fill-amber-400' : 'text-navy-600'} />)}
                 </span>
@@ -151,7 +158,7 @@ function Bandeja({ mensajes, actualizarEstado }) {
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: `${COLOR_ESTADO[estado]}1a`, color: COLOR_ESTADO[estado], border: `1px solid ${COLOR_ESTADO[estado]}4d` }}>{LABEL_ESTADO[estado]}</span>
               <span className="ml-auto text-[11px] text-slate-500">{fmtFechaHora(m.createdAt)}</span>
             </div>
-            <p className="text-sm text-slate-200 mt-2 whitespace-pre-wrap leading-relaxed">{m.mensaje}</p>
+            <p className="text-sm text-slate-200 mt-2 whitespace-pre-wrap leading-relaxed">{m.texto}</p>
             <div className="flex items-center gap-2 mt-2.5 flex-wrap">
               <span className="text-[11px] text-slate-500 truncate">{m.nombre || m.email}</span>
               <div className="ml-auto flex gap-1.5">

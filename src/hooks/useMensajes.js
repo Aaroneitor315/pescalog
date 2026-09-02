@@ -23,10 +23,10 @@ export function useMensajes(user) {
 
   async function enviar(datos) {
     await addDoc(collection(db, 'mensajes'), {
-      ...datos,
+      ...datos, // { tipo, texto, estrellas? }
+      userId: user?.uid || null,
       nombre: user?.displayName || user?.email || '',
       email: user?.email || '',
-      uid: user?.uid || null,
       estado: 'nuevo',
       createdAt: serverTimestamp(),
     })
