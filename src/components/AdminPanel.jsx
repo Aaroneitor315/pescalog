@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useAdmin } from '../hooks/useAdmin'
 import { useConvenio } from '../hooks/useConvenio'
 import { useAdminUsuarios } from '../hooks/useAdminUsuarios'
-import { Shield, Package, ToggleLeft, ToggleRight, Save, Star, FileText, Users, RefreshCw, TrendingUp, CheckCircle, Activity, Wrench, Anchor, Navigation } from 'lucide-react'
+import { Shield, Package, ToggleLeft, ToggleRight, Save, Star, FileText, Users, RefreshCw, TrendingUp, CheckCircle, Activity, Wrench, Anchor, Navigation, Inbox } from 'lucide-react'
+import { BandejaMensajes } from './Buzon'
 
 function fmtNum(n) {
   return (n || 0).toLocaleString('es-AR')
@@ -13,8 +14,9 @@ function fmtFechaCorta(date) {
   return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
-export default function AdminPanel() {
+export default function AdminPanel({ mensajes = [], actualizarMensaje }) {
   const { stats, sponsors, guardarSponsors, cargando } = useAdmin()
+  const nuevosMsg = mensajes.filter(m => (m.estado || 'nuevo') === 'nuevo').length
   const { convenio, guardarVersion } = useConvenio()
   const { usuarios, metricas, cargando: cargandoUsuarios, error: errorUsuarios, recargar } = useAdminUsuarios()
   const [editConvenio, setEditConvenio] = useState(null)
@@ -115,6 +117,18 @@ export default function AdminPanel() {
         </div>
       </div>
 
+
+      {/* Buzón — mensajes recibidos */}
+      <div className="card space-y-4">
+        <div className="flex items-center gap-2">
+          <Inbox size={18} className="text-rose-400" />
+          <h2 className="text-lg font-semibold text-white">Buzón · Mensajes</h2>
+          {nuevosMsg > 0 && (
+            <span className="text-[10px] font-extrabold text-white px-2 py-0.5 rounded-full" style={{ background: '#ef4444' }}>{nuevosMsg} nuevo{nuevosMsg !== 1 ? 's' : ''}</span>
+          )}
+        </div>
+        <BandejaMensajes mensajes={mensajes} actualizarEstado={actualizarMensaje} />
+      </div>
 
       {/* Métricas de usuarios */}
       {metricas && (

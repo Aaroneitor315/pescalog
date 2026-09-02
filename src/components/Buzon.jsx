@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Star, Send, Mail, Archive, Check, Inbox, MessageSquare } from 'lucide-react'
+import { X, Star, Send, Mail, Archive, Check, Inbox, MessageSquare, Search } from 'lucide-react'
 
 // tipo se guarda en minúscula ('reseña'|'sugerencia'|'problema'); el label es solo visual.
 const TIPOS = [
@@ -127,17 +127,24 @@ function Formulario({ user, enviar, onCerrar }) {
   )
 }
 
-// ── Bandeja (admin) ─────────────────────────────────────────────────────────
-function Bandeja({ mensajes, actualizarEstado }) {
+// ── Bandeja (admin) — reutilizable en el overlay y en el Panel Admin ─────────
+export function BandejaMensajes({ mensajes = [], actualizarEstado }) {
   const [fTipo, setFTipo] = useState('todos')
   const [fEstado, setFEstado] = useState('nuevo')
+  const [q, setQ] = useState('')
+  const term = q.trim().toLowerCase()
 
   const lista = mensajes.filter(m =>
     (fTipo === 'todos' || m.tipo === fTipo) &&
-    (fEstado === 'todos' || (m.estado || 'nuevo') === fEstado))
+    (fEstado === 'todos' || (m.estado || 'nuevo') === fEstado) &&
+    (!term || `${m.texto || ''} ${m.nombre || ''} ${m.email || ''}`.toLowerCase().includes(term)))
 
   return (
     <div className="space-y-3">
+      <div className="relative">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por nombre, email o texto…" className="text-sm w-full pl-9" />
+      </div>
       <div className="flex flex-wrap gap-2">
         <select value={fTipo} onChange={e => setFTipo(e.target.value)} className="text-sm py-1.5">
           <option value="todos">Todos los tipos</option>
@@ -174,7 +181,7 @@ function Bandeja({ mensajes, actualizarEstado }) {
             </div>
             <p className="text-sm text-slate-200 mt-2 whitespace-pre-wrap leading-relaxed">{m.texto}</p>
             <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-              <span className="text-[11px] text-slate-500 truncate">{m.nombre || m.email}</span>
+              <span className="text-[11px] text-slate-300 font-medium truncate">{m.nombre || m.email}{m.nombre && m.email && <span className="text-slate-500 font-normal"> · {m.email}</span>}</span>
               <div className="ml-auto flex gap-1.5">
                 {estado === 'nuevo' && (
                   <button onClick={() => actualizarEstado(m.id, 'leido')} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-navy-600 text-slate-300 flex items-center gap-1"><Check size={12} /> Leído</button>
@@ -199,7 +206,7 @@ function Bandeja({ mensajes, actualizarEstado }) {
 export default function Buzon({ user, esAdmin = false, mensajes = [], enviar, actualizarEstado, onCerrar }) {
   return esAdmin ? (
     <Shell title="Buzón · Bandeja de entrada" icon={Inbox} onCerrar={onCerrar}>
-      <Bandeja mensajes={mensajes} actualizarEstado={actualizarEstado} />
+      <BandejaMensajes mensajes={mensajes} actualizarEstado={actualizarEstado} />
     </Shell>
   ) : (
     <Shell title="Buzón de mensajes" icon={MessageSquare} onCerrar={onCerrar}>

@@ -183,7 +183,7 @@ export default function App() {
           />
         )}
         {tab === 'embarcos' && <MisEmbarcos uid={uid} viajes={viajes} libreta={libreta} perfil={perfil} />}
-        {tab === 'admin' && <AdminPanel />}
+        {tab === 'admin' && <AdminPanel mensajes={mensajes} actualizarMensaje={actualizarMensaje} />}
       </main>
     </div>
   )
