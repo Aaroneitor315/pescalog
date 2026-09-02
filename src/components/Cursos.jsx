@@ -117,7 +117,7 @@ export default function Cursos({ esAdmin = false, onVolver }) {
                 </div>
 
                 {/* Cuándo y Dónde destacados */}
-                <div className="grid grid-cols-2 gap-2 mt-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
                   <div className="bg-navy-900 rounded-lg px-3 py-2 border border-navy-700">
                     <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-wide"><Calendar size={12} className="text-indigo-400" /> Cuándo</div>
                     <p className="text-sm text-white font-semibold mt-0.5 leading-tight">{c.cuando || '—'}</p>
@@ -196,8 +196,8 @@ export default function Cursos({ esAdmin = false, onVolver }) {
             <div><label className="text-[10px] text-slate-500 mb-0.5 block">Nota (opcional)</label>
               <textarea rows={3} value={editor.nota} onChange={e => set('nota', e.target.value)} className="text-sm w-full resize-y" /></div>
             <div className="flex gap-2 pt-1">
-              <button onClick={() => setEditor(null)} className="flex-1 btn-ghost py-2 text-sm rounded-lg">Cancelar</button>
-              <button onClick={guardar} disabled={guardando || !editor.nombre.trim()} className="flex-1 btn-primary py-2 text-sm disabled:opacity-50">{guardando ? 'Guardando…' : 'Publicar'}</button>
+              <button onClick={() => setEditor(null)} className="flex-1 btn-ghost py-3 text-sm rounded-lg">Cancelar</button>
+              <button onClick={guardar} disabled={guardando || !editor.nombre.trim()} className="flex-1 btn-primary py-3 text-sm disabled:opacity-50">{guardando ? 'Guardando…' : 'Publicar'}</button>
             </div>
           </div>
         </div>
