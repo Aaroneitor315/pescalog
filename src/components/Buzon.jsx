@@ -118,8 +118,8 @@ function Formulario({ user, enviar, onCerrar }) {
       )}
 
       <div className="flex gap-2">
-        <button onClick={onCerrar} className="flex-1 btn-ghost py-2.5 text-sm rounded-lg">Cancelar</button>
-        <button onClick={submit} disabled={enviando || !texto.trim()} className="flex-1 btn-primary py-2.5 text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+        <button onClick={onCerrar} className="flex-1 btn-ghost py-3 text-sm rounded-lg">Cancelar</button>
+        <button onClick={submit} disabled={enviando || !texto.trim()} className="flex-1 btn-primary py-3 text-sm flex items-center justify-center gap-2 disabled:opacity-50">
           <Send size={15} /> {enviando ? 'Enviando…' : 'Enviar'}
         </button>
       </div>
@@ -180,18 +180,18 @@ export function BandejaMensajes({ mensajes = [], actualizarEstado }) {
               <span className="ml-auto text-[11px] text-slate-500">{fmtFechaHora(m.createdAt)}</span>
             </div>
             <p className="text-sm text-slate-200 mt-2 whitespace-pre-wrap leading-relaxed">{m.texto}</p>
-            <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-2.5">
               <span className="text-[11px] text-slate-300 font-medium truncate">{m.nombre || m.email}{m.nombre && m.email && <span className="text-slate-500 font-normal"> · {m.email}</span>}</span>
-              <div className="ml-auto flex gap-1.5">
+              <div className="flex gap-1.5 sm:ml-auto">
                 {estado === 'nuevo' && (
-                  <button onClick={() => actualizarEstado(m.id, 'leido')} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-navy-600 text-slate-300 flex items-center gap-1"><Check size={12} /> Leído</button>
+                  <button onClick={() => actualizarEstado(m.id, 'leido')} className="flex-1 sm:flex-none justify-center text-[11px] font-semibold px-2.5 py-2 rounded-lg border border-navy-600 text-slate-300 flex items-center gap-1"><Check size={12} /> Leído</button>
                 )}
                 {estado !== 'archivado' && (
-                  <button onClick={() => actualizarEstado(m.id, 'archivado')} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-navy-600 text-slate-400 flex items-center gap-1"><Archive size={12} /> Archivar</button>
+                  <button onClick={() => actualizarEstado(m.id, 'archivado')} className="flex-1 sm:flex-none justify-center text-[11px] font-semibold px-2.5 py-2 rounded-lg border border-navy-600 text-slate-400 flex items-center gap-1"><Archive size={12} /> Archivar</button>
                 )}
                 {m.email && (
                   <a href={`mailto:${m.email}?subject=${encodeURIComponent('Re: tu mensaje en BitácoraAR')}`}
-                    className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1"
+                    className="flex-1 sm:flex-none justify-center text-[11px] font-semibold px-2.5 py-2 rounded-lg flex items-center gap-1"
                     style={{ background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent-line)' }}><Mail size={12} /> Responder</a>
                 )}
               </div>
