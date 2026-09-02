@@ -6,40 +6,123 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email == 'alangambacorta7@gmail.com';
     }
 
-    // Datos por usuario: el propio usuario o el admin pueden leer
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // ── Validaciones de perfil ──────────────────────────────────────────
+    function sectoresValidos() {
+      return ['maquinas', 'cubierta', 'puente'];
+    }
+
+    function rangosValidos() {
+      return {
+        'maquinas': ['Jefe de máquinas', '1° Oficial', '2° Oficial', '3° Oficial', 'Engrasador'],
+        'cubierta':  ['Contramaestre', '1° Pescador', '2° Pescador', 'Marinero', 'Cocinero'],
+        'puente':    ['Capitán', '1° Oficial', '2° Oficial']
+      };
+    }
+
+    function perfilValido(data) {
+      let sector = data.sector;
+      return data.keys().hasAll(['sector', 'rango', 'rubro', 'completado'])
+          && sector in sectoresValidos()
+          && data.rango in rangosValidos()[sector]
+          && data.rubro is string && data.rubro.size() > 0 && data.rubro.size() <= 80
+          && data.completado is bool;
+    }
+
+    // ── Validación de repuesto ──────────────────────────────────────────
+    function repuestoValido(data) {
+      return data.keys().hasAll(['codigo', 'stockActual', 'stockMinimo', 'cantPedir', 'seccion'])
+          && data.codigo is string && data.codigo.size() > 0 && data.codigo.size() <= 50
+          && data.stockActual is int  && data.stockActual  >= 0
+          && data.stockMinimo is int  && data.stockMinimo  >= 0
+          && data.cantPedir   is int  && data.cantPedir    >= 0
+          && data.seccion in sectoresValidos()
+          && (!('descripcion' in data) || (data.descripcion is string && data.descripcion.size() <= 200))
+          && (!('marca'       in data) || (data.marca       is string && data.marca.size()       <= 100))
+          && (!('foto'        in data) || data.foto == null || (data.foto is string && data.foto.size() <= 500));
+    }
+
+    // ── Validación de viaje ─────────────────────────────────────────────
+    function viajeValido(data) {
+      return data.keys().hasAll(['especie', 'fecha'])
+          && data.especie is string && data.especie.size() > 0 && data.especie.size() <= 100
+          && data.fecha   is string;
+    }
+
+    // ── Documento raíz del usuario ──────────────────────────────────────
     match /usuarios/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      allow read, write: if isAdmin();
-    }
-    match /usuarios/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      allow read: if isAdmin();
+      allow read, write: if isOwner(userId) || isAdmin();
     }
 
-    // Stats globales: todos los autenticados pueden escribir, solo admin lee
-    match /stats/{document} {
-      allow read: if isAdmin();
-      allow write: if request.auth != null;
-    }
-
-    // Config global: todos pueden leer, solo admin escribe
-    match /config/{document} {
-      allow read: if request.auth != null;
+    // ── Perfil ──────────────────────────────────────────────────────────
+    match /usuarios/{userId}/config/perfil {
+      allow read:  if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && perfilValido(request.resource.data);
       allow write: if isAdmin();
     }
 
-    // Noticias y Cursos: lectura para logueados, escritura solo admin
+    // ── Resto de config (precios, etc.) ─────────────────────────────────
+    match /usuarios/{userId}/config/{doc} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    // ── Repuestos: escritura restringida al sector del perfil ────────────
+    match /usuarios/{userId}/repuestos/{repuestoId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId)
+          && repuestoValido(request.resource.data)
+          && request.resource.data.seccion ==
+             get(/databases/$(database)/documents/usuarios/$(userId)/config/perfil).data.sector;
+      allow update: if isOwner(userId)
+          && repuestoValido(request.resource.data)
+          && request.resource.data.seccion ==
+             get(/databases/$(database)/documents/usuarios/$(userId)/config/perfil).data.sector;
+      allow delete: if isOwner(userId) || isAdmin();
+      allow write:  if isAdmin();
+    }
+
+    // ── Viajes ──────────────────────────────────────────────────────────
+    match /usuarios/{userId}/viajes/{viajeId} {
+      allow read:   if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && viajeValido(request.resource.data);
+      allow update: if isOwner(userId) && viajeValido(request.resource.data);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // ── Resto de subcolecciones (libreta, etc.) ──────────────────────────
+    match /usuarios/{userId}/{document=**} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    // ── collectionGroup viajes (lectura admin para stats) ────────────────
+    match /{path=**}/viajes/{viajeId} {
+      allow read: if isAdmin();
+    }
+
+    // ── Stats y config global ────────────────────────────────────────────
+    match /stats/{document} {
+      allow read:  if isAdmin();
+      allow write: if request.auth != null;
+    }
+    match /config/{document} {
+      allow read:  if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // ── Noticias y Cursos: lectura logueado, escritura solo admin ────────
     match /noticias/{document} {
-      allow read: if request.auth != null;
+      allow read:  if request.auth != null;
       allow write: if isAdmin();
     }
     match /cursos/{document} {
-      allow read: if request.auth != null;
+      allow read:  if request.auth != null;
       allow write: if isAdmin();
     }
 
-    // Buzón de mensajes: crea cualquier logueado; leer/listar/actualizar solo
-    // admin (nadie ve los mensajes de otros). Sin borrado (archivar = update).
+    // ── Buzón: crea cualquier logueado; leer/listar/actualizar solo admin ─
     match /mensajes/{document} {
       allow create: if request.auth != null;
       allow read, update: if isAdmin();
