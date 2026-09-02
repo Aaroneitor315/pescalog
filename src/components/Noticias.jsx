@@ -224,8 +224,8 @@ export default function Noticias({ esAdmin = false, uid, onVolver }) {
             <div><label className="text-[10px] text-slate-500 mb-0.5 block">Fuente / link (opcional)</label>
               <input value={editor.fuente} onChange={e => set('fuente', e.target.value)} placeholder="INIDEP, o https://…" className="text-sm w-full" /></div>
             <div className="flex gap-2 pt-1">
-              <button onClick={() => setEditor(null)} className="flex-1 btn-ghost py-2 text-sm rounded-lg">Cancelar</button>
-              <button onClick={guardar} disabled={guardando || !editor.titulo.trim()} className="flex-1 btn-primary py-2 text-sm disabled:opacity-50">{guardando ? 'Guardando…' : 'Publicar'}</button>
+              <button onClick={() => setEditor(null)} className="flex-1 btn-ghost py-3 text-sm rounded-lg">Cancelar</button>
+              <button onClick={guardar} disabled={guardando || !editor.titulo.trim()} className="flex-1 btn-primary py-3 text-sm disabled:opacity-50">{guardando ? 'Guardando…' : 'Publicar'}</button>
             </div>
           </div>
         </div>
