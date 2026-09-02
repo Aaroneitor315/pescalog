@@ -228,25 +228,19 @@ function NovedadCard({ n, onClick, badge }) {
   const Icon = n.Icon
   return (
     <button onClick={onClick}
-      className="relative rounded-2xl overflow-hidden transition-all active:scale-95"
-      style={{ border: `1.5px solid ${n.color}40` }}>
-      {/* Fondo (placeholder: degradé + ícono grande atenuado; se reemplaza por la imagen real luego) */}
-      <div className="relative" style={{ aspectRatio: '600 / 354', background: n.grad }}>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Icon size={64} strokeWidth={1.25} style={{ color: n.color, opacity: 0.35 }} />
-        </div>
-        {badge > 0 && (
-          <span className="absolute top-1.5 right-1.5 z-10 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold text-white flex items-center justify-center"
-            style={{ background: '#ef4444', border: '2px solid #080f1a' }}>{badge > 9 ? '9+' : badge}</span>
-        )}
-        {/* Degradé oscuro abajo para el texto */}
-        <div className="absolute inset-x-0 bottom-0 h-3/5 pointer-events-none"
-          style={{ background: 'linear-gradient(to top, rgba(4,7,18,.92) 8%, rgba(4,7,18,.55) 45%, transparent)' }} />
-        {/* Texto superpuesto */}
-        <div className="absolute inset-x-0 bottom-0 px-2.5 pb-2 pt-4 text-left">
-          <p className="text-[13px] font-extrabold leading-tight" style={{ color: n.color }}>{n.label}</p>
-          <p className="text-[10px] leading-tight text-slate-300/90 truncate">{n.sub}</p>
-        </div>
+      className="relative flex flex-col rounded-2xl overflow-hidden transition-all active:scale-95"
+      style={{ background: n.color + '0d', border: `1.5px solid ${n.color}30` }}>
+      {badge > 0 && (
+        <span className="absolute top-1.5 right-1.5 z-10 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold text-white flex items-center justify-center"
+          style={{ background: '#ef4444', border: '2px solid #080f1a' }}>{badge > 9 ? '9+' : badge}</span>
+      )}
+      {/* Portada (placeholder: degradé + ícono; se reemplaza por imagen real luego) */}
+      <div className="flex items-center justify-center" style={{ aspectRatio: '600 / 354', background: n.grad }}>
+        <Icon size={40} strokeWidth={1.5} style={{ color: n.color }} />
+      </div>
+      <div className="px-2 pt-1.5 pb-2.5 text-center">
+        <p className="text-xs font-bold leading-tight" style={{ color: n.color }}>{n.label}</p>
+        <p className="text-[9px] mt-0.5" style={{ color: '#2a4a6a' }}>{n.sub}</p>
       </div>
     </button>
   )
@@ -257,7 +251,7 @@ function NovedadesHero({ onAbrirNoticias, onAbrirCursos, onAbrirBuzon, mensajesN
   return (
     <div>
       <p className="text-[10px] text-slate-600 uppercase tracking-widest font-semibold mb-2.5 px-0.5">Novedades y comunidad</p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-3 gap-2.5">
         {NOVEDADES_INFO.map(n => (
           <NovedadCard key={n.id} n={n} onClick={handlers[n.id]} badge={n.id === 'buzon' ? mensajesNuevos : 0} />
         ))}
@@ -328,7 +322,6 @@ export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirS
     return (
       <div className="space-y-6">
         <SectoresHero perfil={perfil} onAbrirSector={onAbrirSector} esAdmin={esAdmin} />
-        <NovedadesHero onAbrirNoticias={onAbrirNoticias} onAbrirCursos={onAbrirCursos} onAbrirBuzon={onAbrirBuzon} mensajesNuevos={mensajesNuevos} />
         <DolarCards />
         <div className="card text-center py-12 px-6 flex flex-col items-center gap-4">
           <div style={{width:80,height:80,borderRadius:'50%',background:'rgba(6,182,212,0.1)',border:'2px solid rgba(6,182,212,0.2)',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -361,6 +354,7 @@ export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirS
             ))}
           </div>
         </div>
+        <NovedadesHero onAbrirNoticias={onAbrirNoticias} onAbrirCursos={onAbrirCursos} onAbrirBuzon={onAbrirBuzon} mensajesNuevos={mensajesNuevos} />
       </div>
     )
   }
@@ -368,7 +362,6 @@ export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirS
   return (
     <div className="space-y-6">
       <SectoresHero perfil={perfil} onAbrirSector={onAbrirSector} />
-      <NovedadesHero onAbrirNoticias={onAbrirNoticias} onAbrirCursos={onAbrirCursos} onAbrirBuzon={onAbrirBuzon} mensajesNuevos={mensajesNuevos} />
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-semibold text-white">
@@ -495,6 +488,8 @@ export default function Dashboard({ viajes, calcularTotalViaje, config, onAbrirS
           No hay viajes en este período.
         </div>
       )}
+
+      <NovedadesHero onAbrirNoticias={onAbrirNoticias} onAbrirCursos={onAbrirCursos} onAbrirBuzon={onAbrirBuzon} mensajesNuevos={mensajesNuevos} />
 
       <div className="border-t border-navy-700 pt-6">
         <Sponsors />
