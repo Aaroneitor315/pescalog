@@ -1,33 +1,15 @@
 import { useState } from 'react'
-import { GraduationCap, Plus, Pencil, Trash2, X, ArrowLeft, ExternalLink, MapPin, Calendar } from 'lucide-react'
+import { GraduationCap, Plus, Pencil, Trash2, X, ArrowLeft, ExternalLink, MapPin, Calendar, FileText } from 'lucide-react'
 import { useCursos } from '../hooks/useCursos'
 
-const EDITOR_VACIO = { nombre: '', entidad: '', cuando: '', donde: '', modalidad: 'presencial', tipo: 'recomendado', vigencia: '', link: '', nota: '' }
+const EDITOR_VACIO = { nombre: '', entidad: '', cuando: '', donde: '', modalidad: 'presencial', tipo: 'recomendado', link: '', requisitos: '', nota: '' }
 const LABEL_MODAL = { presencial: 'Presencial', online: 'Online' }
-
-// Estado del curso, calculado por vigencia (fecha de vencimiento) + tipo:
-//  - recomendado            → "Recomendado"
-//  - obligatorio + vence en ≤60 días (o vencido) → "Por vencer"
-//  - obligatorio vigente    → "Vigente"
-const COLOR_EST = { porvencer: '#f87171', vigente: '#34d399', recomendado: '#818cf8' }
-function estadoCurso(c) {
-  const iso = /^\d{4}-\d{2}-\d{2}$/.test(c.vigencia || '') ? c.vigencia : null
-  if (c.tipo !== 'recomendado' && iso) {
-    const dias = Math.ceil((new Date(iso + 'T00:00:00') - new Date()) / 86400000)
-    if (dias <= 60) return { key: 'porvencer', label: dias < 0 ? 'Vencido' : 'Por vencer', color: COLOR_EST.porvencer }
-  }
-  if (c.tipo === 'recomendado') return { key: 'recomendado', label: 'Recomendado', color: COLOR_EST.recomendado }
-  return { key: 'vigente', label: 'Vigente', color: COLOR_EST.vigente }
-}
-const fmtVenc = (iso) => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) return iso || ''
-  return new Date(iso + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
+const COLOR_TIPO = { obligatorio: '#f87171', recomendado: '#34d399' }
+const LABEL_TIPO = { obligatorio: 'Obligatorio', recomendado: 'Recomendado' }
 
 const FILTROS = [
   { v: 'todos', label: 'Todos' },
-  { v: 'porvencer', label: 'Por vencer' },
-  { v: 'vigente', label: 'Vigentes' },
+  { v: 'obligatorio', label: 'Obligatorios' },
   { v: 'recomendado', label: 'Recomendados' },
 ]
 
@@ -39,7 +21,7 @@ export default function Cursos({ esAdmin = false, onVolver }) {
 
   function nuevo() { setEditor({ ...EDITOR_VACIO }) }
   function editarCurso(c) {
-    setEditor({ id: c.id, nombre: c.nombre || '', entidad: c.entidad || '', cuando: c.cuando || '', donde: c.donde || '', modalidad: c.modalidad || 'presencial', tipo: c.tipo || 'recomendado', vigencia: c.vigencia || '', link: c.link || '', nota: c.nota || '' })
+    setEditor({ id: c.id, nombre: c.nombre || '', entidad: c.entidad || '', cuando: c.cuando || '', donde: c.donde || '', modalidad: c.modalidad || 'presencial', tipo: c.tipo || 'recomendado', link: c.link || '', requisitos: c.requisitos || '', nota: c.nota || '' })
   }
   function set(campo, valor) { setEditor(s => ({ ...s, [campo]: valor })) }
 
@@ -50,7 +32,7 @@ export default function Cursos({ esAdmin = false, onVolver }) {
       const datos = {
         nombre: editor.nombre.trim(), entidad: editor.entidad.trim(), cuando: editor.cuando.trim(),
         donde: editor.donde.trim(), modalidad: editor.modalidad, tipo: editor.tipo,
-        vigencia: editor.vigencia.trim(), link: editor.link.trim(), nota: editor.nota.trim(),
+        link: editor.link.trim(), requisitos: editor.requisitos.trim(), nota: editor.nota.trim(),
       }
       if (editor.id) await editar(editor.id, datos)
       else await agregar(datos)
@@ -58,7 +40,7 @@ export default function Cursos({ esAdmin = false, onVolver }) {
     } finally { setGuardando(false) }
   }
 
-  const lista = cursos.filter(c => filtro === 'todos' || estadoCurso(c).key === filtro)
+  const lista = cursos.filter(c => filtro === 'todos' || c.tipo === filtro)
 
   return (
     <div className="space-y-4">
@@ -69,7 +51,7 @@ export default function Cursos({ esAdmin = false, onVolver }) {
             <GraduationCap size={22} className="text-indigo-400" />
             <h1 className="text-xl font-bold text-white">Cursos</h1>
           </div>
-          <p className="text-sm text-slate-500 mt-0.5">Formación, seguridad y certificaciones para embarcar.</p>
+          <p className="text-sm text-slate-500 mt-0.5">Dónde hacer los cursos y qué papeles se necesitan para el personal embarcado.</p>
         </div>
         {esAdmin && (
           <button onClick={nuevo} className="btn-primary px-4 py-2 text-sm flex items-center gap-1.5 flex-shrink-0">
@@ -78,7 +60,7 @@ export default function Cursos({ esAdmin = false, onVolver }) {
         )}
       </div>
 
-      {/* Filtros */}
+      {/* Filtros por tipo */}
       <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
         {FILTROS.map(f => (
           <button key={f.v} onClick={() => setFiltro(f.v)}
@@ -99,12 +81,12 @@ export default function Cursos({ esAdmin = false, onVolver }) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {lista.map(c => {
-            const est = estadoCurso(c)
+            const colTipo = COLOR_TIPO[c.tipo] || '#818cf8'
             return (
               <div key={c.id} className="card flex flex-col">
                 <div className="flex items-start gap-2">
                   <div className="flex-1 min-w-0">
-                    <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full mb-1.5" style={{ background: `${est.color}1a`, color: est.color, border: `1px solid ${est.color}4d` }}>{est.label}</span>
+                    <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full mb-1.5" style={{ background: `${colTipo}1a`, color: colTipo, border: `1px solid ${colTipo}4d` }}>{LABEL_TIPO[c.tipo] || c.tipo}</span>
                     <h2 className="text-base font-bold text-white leading-tight">{c.nombre}</h2>
                     {c.entidad && <p className="text-xs text-slate-500 mt-0.5">{c.entidad}</p>}
                   </div>
@@ -128,10 +110,19 @@ export default function Cursos({ esAdmin = false, onVolver }) {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  {c.modalidad && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,.3)' }}>{LABEL_MODAL[c.modalidad] || c.modalidad}</span>}
-                  {c.vigencia && <span className="text-[10px] text-slate-500">Vence: {fmtVenc(c.vigencia)}</span>}
-                </div>
+                {c.modalidad && (
+                  <div className="mt-2">
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,.3)' }}>{LABEL_MODAL[c.modalidad] || c.modalidad}</span>
+                  </div>
+                )}
+
+                {/* Requisitos / papeles necesarios */}
+                {c.requisitos && (
+                  <div className="mt-3 bg-navy-900 border border-navy-700 rounded-lg p-3">
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-wide mb-1"><FileText size={12} className="text-indigo-400" /> Requisitos / papeles</div>
+                    <p className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">{c.requisitos}</p>
+                  </div>
+                )}
 
                 {c.nota && <p className="text-xs text-slate-500 mt-2 whitespace-pre-wrap leading-relaxed flex-1">{c.nota}</p>}
 
@@ -157,7 +148,7 @@ export default function Cursos({ esAdmin = false, onVolver }) {
             </div>
             <div><label className="text-[10px] text-slate-500 mb-0.5 block">Nombre</label>
               <input autoFocus value={editor.nombre} onChange={e => set('nombre', e.target.value)} className="text-sm w-full" /></div>
-            <div><label className="text-[10px] text-slate-500 mb-0.5 block">Entidad</label>
+            <div><label className="text-[10px] text-slate-500 mb-0.5 block">Entidad / organiza</label>
               <input value={editor.entidad} onChange={e => set('entidad', e.target.value)} placeholder="Prefectura, sindicato…" className="text-sm w-full" /></div>
             <div className="grid grid-cols-2 gap-2">
               <div><label className="text-[10px] text-slate-500 mb-0.5 block">Cuándo</label>
@@ -187,14 +178,12 @@ export default function Cursos({ esAdmin = false, onVolver }) {
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><label className="text-[10px] text-slate-500 mb-0.5 block">Vence (obligatorios)</label>
-                <input type="date" value={editor.vigencia} onChange={e => set('vigencia', e.target.value)} className="text-sm w-full" /></div>
-              <div><label className="text-[10px] text-slate-500 mb-0.5 block">Link</label>
-                <input value={editor.link} onChange={e => set('link', e.target.value)} placeholder="https://…" className="text-sm w-full" /></div>
-            </div>
+            <div><label className="text-[10px] text-slate-500 mb-0.5 block">Requisitos / papeles necesarios</label>
+              <textarea rows={5} value={editor.requisitos} onChange={e => set('requisitos', e.target.value)} placeholder="Pegá acá la info: qué documentación se necesita (DNI, apto médico, libreta…), inscripción, costos, etc." className="text-sm w-full resize-y" /></div>
+            <div><label className="text-[10px] text-slate-500 mb-0.5 block">Link (info / inscripción, opcional)</label>
+              <input value={editor.link} onChange={e => set('link', e.target.value)} placeholder="https://…" className="text-sm w-full" /></div>
             <div><label className="text-[10px] text-slate-500 mb-0.5 block">Nota (opcional)</label>
-              <textarea rows={3} value={editor.nota} onChange={e => set('nota', e.target.value)} className="text-sm w-full resize-y" /></div>
+              <textarea rows={2} value={editor.nota} onChange={e => set('nota', e.target.value)} className="text-sm w-full resize-y" /></div>
             <div className="flex gap-2 pt-1">
               <button onClick={() => setEditor(null)} className="flex-1 btn-ghost py-3 text-sm rounded-lg">Cancelar</button>
               <button onClick={guardar} disabled={guardando || !editor.nombre.trim()} className="flex-1 btn-primary py-3 text-sm disabled:opacity-50">{guardando ? 'Guardando…' : 'Publicar'}</button>
