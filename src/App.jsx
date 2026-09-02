@@ -101,7 +101,7 @@ export default function App() {
     <div className="min-h-screen">
       <NetworkBanner />
       <BannerVencimientos documentos={libreta.documentos} onIrLibreta={() => setTab('libreta')} />
-      <Navbar tab={tab} setTab={setTab} user={user} onCerrarSesion={cerrarSesion} perfil={perfil} alertasLibreta={contarAlertasLibreta()} />
+      <Navbar tab={tab} setTab={setTab} user={user} onCerrarSesion={cerrarSesion} perfil={perfil} alertasLibreta={contarAlertasLibreta()} onAbrirBuzon={() => setBuzonAbierto(true)} />
 
       {/* Panel sectores a bordo */}
       {sectorAbierto && (

@@ -41,13 +41,20 @@ function Formulario({ user, enviar, onCerrar }) {
   const [estrellas, setEstrellas] = useState(5)
   const [enviando, setEnviando] = useState(false)
   const [ok, setOk] = useState(false)
+  const [error, setError] = useState('')
+
+  function limpiar() { setTipo('reseña'); setTexto(''); setEstrellas(5) }
 
   async function submit() {
     if (!texto.trim()) return
+    setError('')
     setEnviando(true)
     try {
       await enviar({ tipo, texto: texto.trim(), ...(tipo === 'reseña' ? { estrellas } : {}) })
+      limpiar()      // limpia el form
       setOk(true)
+    } catch (e) {
+      setError('No se pudo enviar. Revisá tu conexión e intentá de nuevo.')
     } finally { setEnviando(false) }
   }
 
@@ -56,9 +63,12 @@ function Formulario({ user, enviar, onCerrar }) {
       <div className="w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center mx-auto mb-4">
         <Check size={30} className="text-emerald-400" />
       </div>
-      <h3 className="text-white font-bold text-lg">¡Gracias!</h3>
-      <p className="text-slate-400 text-sm mt-1">Recibimos tu mensaje. Lo vamos a leer pronto.</p>
-      <button onClick={onCerrar} className="btn-primary px-6 py-2.5 text-sm mt-5">Cerrar</button>
+      <h3 className="text-white font-bold text-lg">¡Gracias, lo recibimos!</h3>
+      <p className="text-slate-400 text-sm mt-1">Vamos a leer tu mensaje pronto.</p>
+      <div className="flex gap-2 justify-center mt-5">
+        <button onClick={() => setOk(false)} className="btn-ghost px-5 py-2.5 text-sm rounded-lg">Enviar otro</button>
+        <button onClick={onCerrar} className="btn-primary px-6 py-2.5 text-sm">Cerrar</button>
+      </div>
     </div>
   )
 
@@ -102,6 +112,10 @@ function Formulario({ user, enviar, onCerrar }) {
       <div className="text-[11px] text-slate-500 bg-navy-800 border border-navy-700 rounded-lg px-3 py-2">
         Se envía como <b className="text-slate-300">{user?.email}</b>
       </div>
+
+      {error && (
+        <p className="text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">{error}</p>
+      )}
 
       <div className="flex gap-2">
         <button onClick={onCerrar} className="flex-1 btn-ghost py-2.5 text-sm rounded-lg">Cancelar</button>

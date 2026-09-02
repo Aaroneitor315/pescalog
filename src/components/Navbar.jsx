@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LogOut, Shield, BarChart2, List, Plus, BookOpen, MoreHorizontal, DollarSign, Calculator, Anchor, X } from 'lucide-react'
+import { LogOut, Shield, BarChart2, List, Plus, BookOpen, MoreHorizontal, DollarSign, Calculator, Anchor, X, Mail } from 'lucide-react'
 import { esAdmin } from '../hooks/useAdmin'
 import { SECTORES } from '../hooks/usePerfil'
 
@@ -28,7 +28,7 @@ const TABS_MAS = [
   { id: 'embarcos', label: 'Mis embarcos', icon: Anchor },
 ]
 
-export default function Navbar({ tab, setTab, user, onCerrarSesion, perfil, alertasLibreta = 0 }) {
+export default function Navbar({ tab, setTab, user, onCerrarSesion, perfil, alertasLibreta = 0, onAbrirBuzon }) {
   const admin = esAdmin(user)
   const [masAbierto, setMasAbierto] = useState(false)
 
@@ -105,6 +105,12 @@ export default function Navbar({ tab, setTab, user, onCerrarSesion, perfil, aler
                 {t.label}
               </button>
             ))}
+            {onAbrirBuzon && (
+              <button onClick={onAbrirBuzon}
+                className="nav-tab whitespace-nowrap flex items-center gap-1.5">
+                <Mail size={13} className="text-rose-400" /> Buzón
+              </button>
+            )}
             {admin && (
               <button onClick={() => setTab('admin')}
                 className={`nav-tab whitespace-nowrap flex items-center gap-1.5 ${tab === 'admin' ? 'active' : ''}`}>
@@ -148,6 +154,13 @@ export default function Navbar({ tab, setTab, user, onCerrarSesion, perfil, aler
                   </button>
                 )
               })}
+              {onAbrirBuzon && (
+                <button onClick={() => { setMasAbierto(false); onAbrirBuzon() }}
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl bg-navy-700/60 text-slate-300 hover:bg-navy-700 transition-colors">
+                  <Mail size={18} className="text-rose-400" />
+                  <span className="text-sm font-medium">Buzón</span>
+                </button>
+              )}
               {admin && (
                 <button onClick={() => irA('admin')}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${tab === 'admin' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'bg-navy-700/60 text-slate-300 hover:bg-navy-700'}`}>
