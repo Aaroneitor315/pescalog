@@ -27,5 +27,22 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if isAdmin();
     }
+
+    // Noticias y Cursos: lectura para logueados, escritura solo admin
+    match /noticias/{document} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+    match /cursos/{document} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // Buzón de mensajes: crea cualquier logueado; leer/listar/actualizar solo
+    // admin (nadie ve los mensajes de otros). Sin borrado (archivar = update).
+    match /mensajes/{document} {
+      allow create: if request.auth != null;
+      allow read, update: if isAdmin();
+    }
   }
 }

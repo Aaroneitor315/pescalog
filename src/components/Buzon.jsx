@@ -1,0 +1,188 @@
+import { useState } from 'react'
+import { X, Star, Send, Mail, Archive, Check, Inbox, MessageSquare } from 'lucide-react'
+
+const TIPOS = ['Reseña', 'Sugerencia', 'Problema']
+const COLOR_TIPO = { 'Reseña': '#fbbf24', 'Sugerencia': '#22d3ee', 'Problema': '#f87171' }
+const COLOR_ESTADO = { nuevo: '#34d399', leido: '#64748b', archivado: '#475569' }
+const LABEL_ESTADO = { nuevo: 'Nuevo', leido: 'Leído', archivado: 'Archivado' }
+
+const fmtFechaHora = (ts) => {
+  const d = ts?.toDate?.()
+  return d ? d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''
+}
+
+function Shell({ title, icon: Icon, onCerrar, children }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 sm:px-4" onClick={onCerrar}>
+      <div className="bg-navy-900 border border-navy-600 w-full sm:max-w-2xl sm:rounded-2xl rounded-t-2xl max-h-[92vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-2.5 px-5 py-4 border-b border-navy-700 bg-navy-800">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(244,63,94,.12)', border: '1px solid rgba(244,63,94,.3)' }}>
+            <Icon size={18} className="text-rose-400" />
+          </div>
+          <h2 className="text-white font-bold text-base flex-1">{title}</h2>
+          <button onClick={onCerrar} className="w-9 h-9 rounded-lg border border-navy-600 flex items-center justify-center text-slate-400 hover:text-white"><X size={18} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-5">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+// ── Formulario (usuario logueado) ──────────────────────────────────────────
+function Formulario({ user, enviar, onCerrar }) {
+  const [tipo, setTipo] = useState('Reseña')
+  const [mensaje, setMensaje] = useState('')
+  const [estrellas, setEstrellas] = useState(5)
+  const [enviando, setEnviando] = useState(false)
+  const [ok, setOk] = useState(false)
+
+  async function submit() {
+    if (!mensaje.trim()) return
+    setEnviando(true)
+    try {
+      await enviar({ tipo, mensaje: mensaje.trim(), ...(tipo === 'Reseña' ? { estrellas } : {}) })
+      setOk(true)
+    } finally { setEnviando(false) }
+  }
+
+  if (ok) return (
+    <div className="text-center py-10">
+      <div className="w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center mx-auto mb-4">
+        <Check size={30} className="text-emerald-400" />
+      </div>
+      <h3 className="text-white font-bold text-lg">¡Gracias!</h3>
+      <p className="text-slate-400 text-sm mt-1">Recibimos tu mensaje. Lo vamos a leer pronto.</p>
+      <button onClick={onCerrar} className="btn-primary px-6 py-2.5 text-sm mt-5">Cerrar</button>
+    </div>
+  )
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-400">Contanos qué te parece la app, sugerí una mejora o reportá un problema.</p>
+
+      <div>
+        <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1.5 block">Tipo</label>
+        <div className="grid grid-cols-3 gap-2">
+          {TIPOS.map(t => (
+            <button key={t} onClick={() => setTipo(t)}
+              className="py-2.5 rounded-lg text-sm font-semibold transition-colors"
+              style={tipo === t
+                ? { background: `${COLOR_TIPO[t]}1f`, color: COLOR_TIPO[t], border: `1px solid ${COLOR_TIPO[t]}66` }
+                : { background: '#0d1829', color: '#94a3b8', border: '1px solid #1a304e' }}>
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tipo === 'Reseña' && (
+        <div>
+          <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1.5 block">Puntuación</label>
+          <div className="flex gap-1.5">
+            {[1, 2, 3, 4, 5].map(n => (
+              <button key={n} onClick={() => setEstrellas(n)} aria-label={`${n} estrellas`}>
+                <Star size={30} className={n <= estrellas ? 'text-amber-400 fill-amber-400' : 'text-navy-600'} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <label className="text-[10px] text-slate-500 uppercase tracking-widest mb-1.5 block">Mensaje</label>
+        <textarea rows={5} value={mensaje} onChange={e => setMensaje(e.target.value)} placeholder="Escribí acá…" className="text-sm w-full resize-y" />
+      </div>
+
+      <div className="text-[11px] text-slate-500 bg-navy-800 border border-navy-700 rounded-lg px-3 py-2">
+        Se envía como <b className="text-slate-300">{user?.email}</b>
+      </div>
+
+      <div className="flex gap-2">
+        <button onClick={onCerrar} className="flex-1 btn-ghost py-2.5 text-sm rounded-lg">Cancelar</button>
+        <button onClick={submit} disabled={enviando || !mensaje.trim()} className="flex-1 btn-primary py-2.5 text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+          <Send size={15} /> {enviando ? 'Enviando…' : 'Enviar'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Bandeja (admin) ─────────────────────────────────────────────────────────
+function Bandeja({ mensajes, actualizarEstado }) {
+  const [fTipo, setFTipo] = useState('todos')
+  const [fEstado, setFEstado] = useState('nuevo')
+
+  const lista = mensajes.filter(m =>
+    (fTipo === 'todos' || m.tipo === fTipo) &&
+    (fEstado === 'todos' || (m.estado || 'nuevo') === fEstado))
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        <select value={fTipo} onChange={e => setFTipo(e.target.value)} className="text-sm py-1.5">
+          <option value="todos">Todos los tipos</option>
+          {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <select value={fEstado} onChange={e => setFEstado(e.target.value)} className="text-sm py-1.5">
+          <option value="todos">Todos los estados</option>
+          <option value="nuevo">Nuevos</option>
+          <option value="leido">Leídos</option>
+          <option value="archivado">Archivados</option>
+        </select>
+        <span className="ml-auto text-xs text-slate-500 self-center">{lista.length} mensaje{lista.length !== 1 ? 's' : ''}</span>
+      </div>
+
+      {lista.length === 0 ? (
+        <div className="text-center py-12 text-slate-500">
+          <Inbox size={40} className="mx-auto mb-3 text-slate-700" />
+          <p className="text-sm">Sin mensajes en este filtro.</p>
+        </div>
+      ) : lista.map(m => {
+        const estado = m.estado || 'nuevo'
+        return (
+          <div key={m.id} className="bg-navy-800 border border-navy-700 rounded-xl p-3.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: `${COLOR_TIPO[m.tipo]}1a`, color: COLOR_TIPO[m.tipo], border: `1px solid ${COLOR_TIPO[m.tipo]}4d` }}>{m.tipo}</span>
+              {m.tipo === 'Reseña' && typeof m.estrellas === 'number' && (
+                <span className="inline-flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map(n => <Star key={n} size={13} className={n <= m.estrellas ? 'text-amber-400 fill-amber-400' : 'text-navy-600'} />)}
+                </span>
+              )}
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: `${COLOR_ESTADO[estado]}1a`, color: COLOR_ESTADO[estado], border: `1px solid ${COLOR_ESTADO[estado]}4d` }}>{LABEL_ESTADO[estado]}</span>
+              <span className="ml-auto text-[11px] text-slate-500">{fmtFechaHora(m.createdAt)}</span>
+            </div>
+            <p className="text-sm text-slate-200 mt-2 whitespace-pre-wrap leading-relaxed">{m.mensaje}</p>
+            <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+              <span className="text-[11px] text-slate-500 truncate">{m.nombre || m.email}</span>
+              <div className="ml-auto flex gap-1.5">
+                {estado === 'nuevo' && (
+                  <button onClick={() => actualizarEstado(m.id, 'leido')} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-navy-600 text-slate-300 flex items-center gap-1"><Check size={12} /> Leído</button>
+                )}
+                {estado !== 'archivado' && (
+                  <button onClick={() => actualizarEstado(m.id, 'archivado')} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-navy-600 text-slate-400 flex items-center gap-1"><Archive size={12} /> Archivar</button>
+                )}
+                {m.email && (
+                  <a href={`mailto:${m.email}?subject=${encodeURIComponent('Re: tu mensaje en BitácoraAR')}`}
+                    className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1"
+                    style={{ background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent-line)' }}><Mail size={12} /> Responder</a>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export default function Buzon({ user, esAdmin = false, mensajes = [], enviar, actualizarEstado, onCerrar }) {
+  return esAdmin ? (
+    <Shell title="Buzón · Bandeja de entrada" icon={Inbox} onCerrar={onCerrar}>
+      <Bandeja mensajes={mensajes} actualizarEstado={actualizarEstado} />
+    </Shell>
+  ) : (
+    <Shell title="Buzón de mensajes" icon={MessageSquare} onCerrar={onCerrar}>
+      <Formulario user={user} enviar={enviar} onCerrar={onCerrar} />
+    </Shell>
+  )
+}

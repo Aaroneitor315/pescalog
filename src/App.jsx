@@ -13,6 +13,11 @@ import PanelMaquinista from './components/PanelMaquinista'
 import NetworkBanner from './components/NetworkBanner'
 import Onboarding from './components/Onboarding'
 import BannerVencimientos from './components/BannerVencimientos'
+import Noticias from './components/Noticias'
+import Cursos from './components/Cursos'
+import Buzon from './components/Buzon'
+import { useMensajes } from './hooks/useMensajes'
+import { esAdmin } from './hooks/useAdmin'
 import { useViajes } from './hooks/useViajes'
 import { usePrecios } from './hooks/usePrecios'
 import { useLibreta } from './hooks/useLibreta'
@@ -24,8 +29,11 @@ export default function App() {
   const [tab, setTab] = useState('dashboard')
   const [viajeEditando, setViajeEditando] = useState(null)
   const [sectorAbierto, setSectorAbierto] = useState(null)
+  const [buzonAbierto, setBuzonAbierto] = useState(false)
 
   const uid = user?.uid || null
+  const admin = esAdmin(user)
+  const { mensajes, enviar: enviarMensaje, actualizarEstado: actualizarMensaje, nuevos: mensajesNuevos } = useMensajes(user)
   const { perfil, cargando: cargandoPerfil, guardarPerfil } = usePerfil(uid)
   const { viajes, agregarViaje, eliminarViaje, editarViaje } = useViajes(uid)
   const { config, setPrecioEspecie, setTipoCambio, guardarTodos, calcularTotalViaje } = usePrecios(uid)
@@ -100,6 +108,12 @@ export default function App() {
         <PanelMaquinista uid={uid} seccion={sectorAbierto} onCerrar={() => setSectorAbierto(null)} />
       )}
 
+      {/* Buzón de mensajes (formulario para usuarios, bandeja para admin) */}
+      {buzonAbierto && (
+        <Buzon user={user} esAdmin={admin} mensajes={mensajes} enviar={enviarMensaje}
+          actualizarEstado={actualizarMensaje} onCerrar={() => setBuzonAbierto(false)} />
+      )}
+
       <main className="max-w-6xl mx-auto px-4 pt-8 pb-24 sm:py-8 relative">
         <img
           src="/logo.png"
@@ -115,9 +129,15 @@ export default function App() {
             onAbrirSector={setSectorAbierto}
             onNuevoViaje={() => setTab('nuevo')}
             perfil={perfil}
-          esAdmin={user?.email === 'alangambacorta7@gmail.com'}
+            esAdmin={admin}
+            onAbrirNoticias={() => setTab('noticias')}
+            onAbrirCursos={() => setTab('cursos')}
+            onAbrirBuzon={() => setBuzonAbierto(true)}
+            mensajesNuevos={mensajesNuevos}
           />
         )}
+        {tab === 'noticias' && <Noticias esAdmin={admin} onVolver={() => setTab('dashboard')} />}
+        {tab === 'cursos' && <Cursos esAdmin={admin} onVolver={() => setTab('dashboard')} />}
         {tab === 'historial' && (
           <HistorialViajes
             viajes={viajes}
