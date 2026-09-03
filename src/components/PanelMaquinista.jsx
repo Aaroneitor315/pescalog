@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Camera, Plus, Minus, Trash2, Wrench, Anchor, Loader, Pencil, Save, Search, AlertTriangle, Check, Copy, MessageCircle, Package, ClipboardCheck, ChevronDown, ChevronUp, Play, Square } from 'lucide-react'
+import { X, Camera, Plus, Minus, Trash2, Wrench, Anchor, Loader, Pencil, Save, Search, AlertTriangle, Check, Copy, MessageCircle, Package, ClipboardCheck, ChevronDown, ChevronUp, Play, Square, Calculator } from 'lucide-react'
 import { createWorker } from 'tesseract.js'
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import { getDoc, setDoc, doc } from 'firebase/firestore'
@@ -376,10 +376,10 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
   const sector = SECTORES[seccion] || SECTORES.maquinas
   const { Icon } = sector
   const { repuestos, cargando, agregar, editar, actualizarStock, eliminar } = useRepuestos(uid, seccion)
-  const vistaInicial = 'stock'
+  // En Cubierta/Puente la Calculadora es la vista principal (abre ahí).
+  const vistaInicial = (seccion === 'cubierta' || seccion === 'puente') ? 'calc' : 'stock'
   const [vista, setVista] = useState(vistaInicial)
   const [segmentoRep, setSegmentoRep] = useState('inventario') // inventario | orden
-  const [segmentoArte, setSegmentoArte] = useState('inventario') // inventario | calculadora
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('todos') // todos | ok | low | out
   const [pedidoCant, setPedidoCant] = useState({}) // cantidad a pedir por id (override del sugerido)
@@ -890,22 +890,27 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
 
       {/* Tabs — 2 pastillas con acento de la sección */}
       <div className="flex gap-2 px-4 py-3 border-b border-navy-700 bg-navy-800 flex-shrink-0">
-        {[
-          seccion === 'maquinas'
-            ? { id: 'ficha', label: 'Motores', Icon: Wrench, n: (fichaMotor.motores || []).length, alertas: alertasMotor }
-            : { id: 'artes', label: 'Artes', Icon: Anchor, n: artesItems.length, alertas: 0 },
-          { id: 'stock', label: 'Repuestos', Icon: Package, n: repuestos.length, alertas: pendientes.length },
-        ].map(({ id, label, Icon, n, alertas }) => {
+        {(seccion === 'maquinas'
+          ? [
+              { id: 'ficha', label: 'Motores', Icon: Wrench, n: (fichaMotor.motores || []).length, alertas: alertasMotor },
+              { id: 'stock', label: 'Repuestos', Icon: Package, n: repuestos.length, alertas: pendientes.length },
+            ]
+          : [
+              { id: 'calc', label: 'Calculadora', Icon: Calculator, n: null, alertas: 0 },
+              { id: 'artes', label: 'Artes', Icon: Anchor, n: artesItems.length, alertas: 0 },
+              { id: 'stock', label: 'Repuestos', Icon: Package, n: repuestos.length, alertas: pendientes.length },
+            ]
+        ).map(({ id, label, Icon, n, alertas }) => {
           const activo = vista === id
           return (
             <button key={id} onClick={() => setVista(id)}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-colors"
+              className="flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border text-sm font-semibold transition-colors"
               style={activo
                 ? { background: 'var(--accent-soft)', borderColor: 'var(--accent-line)', color: 'var(--accent)' }
                 : { background: '#0d1829', borderColor: '#1a304e', color: '#94a3b8' }}>
-              <Icon size={16} />
-              {label}
-              <span className="text-xs opacity-80 tabular-nums">({n})</span>
+              <Icon size={16} className="flex-shrink-0" />
+              <span className="truncate">{label}</span>
+              {n != null && <span className="text-xs opacity-80 tabular-nums">({n})</span>}
               {alertas > 0 && <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{alertas}</span>}
             </button>
           )
@@ -924,24 +929,6 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
                   style={activo ? { background: 'var(--accent)', color: '#07131f' } : { color: '#94a3b8' }}>
                   {label}
                   {badge > 0 && <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{badge}</span>}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Sub-header: segmento Inventario / Calculadora (solo en Artes) */}
-      {vista === 'artes' && (seccion === 'cubierta' || seccion === 'puente') && (
-        <div className="px-4 py-2 border-b border-navy-700 bg-navy-800 flex-shrink-0">
-          <div className="flex gap-1 bg-navy-900 border border-navy-700 rounded-xl p-1">
-            {[['inventario', 'Inventario'], ['calculadora', 'Calculadora']].map(([id, label]) => {
-              const activo = segmentoArte === id
-              return (
-                <button key={id} onClick={() => setSegmentoArte(id)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-colors"
-                  style={activo ? { background: 'var(--accent)', color: '#07131f' } : { color: '#94a3b8' }}>
-                  {label}
                 </button>
               )
             })}
@@ -1484,9 +1471,12 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
         )}
 
         {/* ===== VISTA ARTES DE PESCA (cubierta + puente, datos compartidos) ===== */}
+        {vista === 'calc' && (seccion === 'cubierta' || seccion === 'puente') && (
+          <ArtesPescaPanel accent={sector.accent} />
+        )}
+
         {vista === 'artes' && (seccion === 'cubierta' || seccion === 'puente') && (
-          <>
-          <div className={`p-4 space-y-3 ${segmentoArte === 'calculadora' ? 'hidden' : ''}`}>
+          <div className="p-4 space-y-3">
             <p className="text-[10px] text-slate-500 uppercase tracking-widest">Inventario de artes</p>
 
             {/* Formulario alta/edición */}
@@ -1645,11 +1635,6 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
               </div>
             )}
           </div>
-          {/* Calculadoras de aparejo — se mantiene montado para no perder el estado al alternar */}
-          <div className={segmentoArte === 'inventario' ? 'hidden' : ''}>
-            <ArtesPescaPanel accent={sector.accent} />
-          </div>
-          </>
         )}
 
         {/* ===== VISTA ORDEN DE COMPRA (segmento de Repuestos) ===== */}
@@ -1750,7 +1735,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
             </span>
           </div>
         )}
-        {vista === 'artes' && segmentoArte === 'inventario' && (seccion === 'cubierta' || seccion === 'puente') && (
+        {vista === 'artes' && (seccion === 'cubierta' || seccion === 'puente') && (
           <div className="flex justify-between items-center gap-3 text-xs">
             <span className="text-slate-400">
               Total: <b className="text-white">{unidadesArtes} unidades</b> en <b className="text-white">{artesItems.length} arte{artesItems.length === 1 ? '' : 's'}</b>
