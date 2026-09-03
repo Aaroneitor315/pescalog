@@ -7,6 +7,27 @@ const LABEL_MODAL = { presencial: 'Presencial', online: 'Online' }
 const COLOR_TIPO = { obligatorio: '#f87171', recomendado: '#34d399' }
 const LABEL_TIPO = { obligatorio: 'Obligatorio', recomendado: 'Recomendado' }
 
+// Renderiza texto respetando saltos de línea y volviendo clickeables las URLs
+// y los mails (por si se pega un link o un correo de inscripción).
+function TextoConLinks({ text, className }) {
+  const re = /(https?:\/\/[^\s]+)|([^\s@]+@[^\s@]+\.[^\s@]+)/g
+  return (
+    <p className={className}>
+      {String(text || '').split('\n').map((linea, li, arr) => {
+        const out = []; let last = 0; let m; let i = 0
+        while ((m = re.exec(linea))) {
+          if (m.index > last) out.push(linea.slice(last, m.index))
+          const href = m[1] ? m[1] : `mailto:${m[2]}`
+          out.push(<a key={`${li}-${i++}`} href={href} target={m[1] ? '_blank' : undefined} rel="noopener noreferrer" className="text-cyan-400 underline break-all">{m[0]}</a>)
+          last = re.lastIndex
+        }
+        if (last < linea.length) out.push(linea.slice(last))
+        return <span key={li}>{out}{li < arr.length - 1 && <br />}</span>
+      })}
+    </p>
+  )
+}
+
 const FILTROS = [
   { v: 'todos', label: 'Todos' },
   { v: 'obligatorio', label: 'Obligatorios' },
@@ -120,7 +141,7 @@ export default function Cursos({ esAdmin = false, onVolver }) {
                 {c.requisitos && (
                   <div className="mt-3 bg-navy-900 border border-navy-700 rounded-lg p-3">
                     <div className="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase tracking-wide mb-1"><FileText size={12} className="text-indigo-400" /> Requisitos / papeles</div>
-                    <p className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">{c.requisitos}</p>
+                    <TextoConLinks text={c.requisitos} className="text-xs text-slate-300 leading-relaxed" />
                   </div>
                 )}
 
