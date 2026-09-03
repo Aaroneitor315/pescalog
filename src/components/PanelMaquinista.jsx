@@ -8,6 +8,7 @@ import { useRepuestos } from '../hooks/useRepuestos'
 import StatusPill, { estadoStock, colorEstado } from './StatusPill'
 import { estadoTarea, estadoMotor, motorTieneAlerta, fechaEstimadaProximo, horasActuales, horasParcialActual, mesKey, usoMensualSerie } from '../lib/motores'
 import MotorHero from './MotorHero'
+import ArtesPescaPanel from './ArtesPescaPanel'
 
 // Cada sección aporta su color de acento. Se expone como variables CSS
 // (--accent / --accent-soft / --accent-line) en la raíz del modal, así el resto
@@ -378,6 +379,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
   const vistaInicial = 'stock'
   const [vista, setVista] = useState(vistaInicial)
   const [segmentoRep, setSegmentoRep] = useState('inventario') // inventario | orden
+  const [segmentoArte, setSegmentoArte] = useState('inventario') // inventario | calculadora
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('todos') // todos | ok | low | out
   const [pedidoCant, setPedidoCant] = useState({}) // cantidad a pedir por id (override del sugerido)
@@ -929,6 +931,24 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
         </div>
       )}
 
+      {/* Sub-header: segmento Inventario / Calculadora (solo en Artes) */}
+      {vista === 'artes' && (seccion === 'cubierta' || seccion === 'puente') && (
+        <div className="px-4 py-2 border-b border-navy-700 bg-navy-800 flex-shrink-0">
+          <div className="flex gap-1 bg-navy-900 border border-navy-700 rounded-xl p-1">
+            {[['inventario', 'Inventario'], ['calculadora', 'Calculadora']].map(([id, label]) => {
+              const activo = segmentoArte === id
+              return (
+                <button key={id} onClick={() => setSegmentoArte(id)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-colors"
+                  style={activo ? { background: 'var(--accent)', color: '#07131f' } : { color: '#94a3b8' }}>
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Contenido scrolleable */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
 
@@ -1465,7 +1485,8 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
 
         {/* ===== VISTA ARTES DE PESCA (cubierta + puente, datos compartidos) ===== */}
         {vista === 'artes' && (seccion === 'cubierta' || seccion === 'puente') && (
-          <div className="p-4 space-y-3">
+          <>
+          <div className={`p-4 space-y-3 ${segmentoArte === 'calculadora' ? 'hidden' : ''}`}>
             <p className="text-[10px] text-slate-500 uppercase tracking-widest">Inventario de artes</p>
 
             {/* Formulario alta/edición */}
@@ -1624,6 +1645,11 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
               </div>
             )}
           </div>
+          {/* Calculadoras de aparejo — se mantiene montado para no perder el estado al alternar */}
+          <div className={segmentoArte === 'inventario' ? 'hidden' : ''}>
+            <ArtesPescaPanel accent={sector.accent} />
+          </div>
+          </>
         )}
 
         {/* ===== VISTA ORDEN DE COMPRA (segmento de Repuestos) ===== */}
@@ -1724,7 +1750,7 @@ export default function PanelMaquinista({ uid, seccion = 'maquinas', onCerrar })
             </span>
           </div>
         )}
-        {vista === 'artes' && (seccion === 'cubierta' || seccion === 'puente') && (
+        {vista === 'artes' && segmentoArte === 'inventario' && (seccion === 'cubierta' || seccion === 'puente') && (
           <div className="flex justify-between items-center gap-3 text-xs">
             <span className="text-slate-400">
               Total: <b className="text-white">{unidadesArtes} unidades</b> en <b className="text-white">{artesItems.length} arte{artesItems.length === 1 ? '' : 's'}</b>
