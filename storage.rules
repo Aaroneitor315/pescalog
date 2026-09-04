@@ -6,11 +6,20 @@ service firebase.storage {
       return request.auth != null && request.auth.token.email == 'alangambacorta7@gmail.com';
     }
 
-    // Fotos de repuestos: cada usuario lee/escribe lo suyo; admin lee todo.
-    match /repuestos/{userId}/{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
-      allow read: if isAdmin();
+    match /repuestos/{userId}/{seccion}/{archivo} {
+
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.contentType == 'image/jpeg'
+        && request.resource.size <= 200 * 1024
+        && seccion in ['maquinas', 'cubierta', 'puente']
+        && seccion == firestore.get(
+            /databases/(default)/documents/usuarios/$(userId)/config/perfil
+          ).data.sector;
+
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
 
     // Portadas de noticias: lectura para logueados, escritura solo admin.
