@@ -7,8 +7,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['logo.png'],
+      includeAssets: ['logo.png', 'favicon.svg', 'apple-touch-icon.png'],
       manifest: {
+        id: '/',
+        lang: 'es-AR',
         name: 'BitácoraAR',
         short_name: 'BitácoraAR',
         description: 'Registro de viajes de pesca de altura para tripulantes argentinos',
@@ -18,12 +20,9 @@ export default defineConfig({
         orientation: 'portrait',
         start_url: '/',
         icons: [
-          {
-            src: 'logo.png',
-            sizes: 'any',
-            type: 'image/png',
-            purpose: 'any maskable',
-          },
+          { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
