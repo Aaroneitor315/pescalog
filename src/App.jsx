@@ -37,7 +37,7 @@ export default function App() {
   const { perfil, cargando: cargandoPerfil, guardarPerfil } = usePerfil(uid)
   const { viajes, agregarViaje, eliminarViaje, editarViaje } = useViajes(uid)
   const { config, setPrecioEspecie, setTipoCambio, guardarTodos, calcularTotalViaje } = usePrecios(uid)
-  const { libreta, actualizarPerfil, actualizarDocumento, agregarDocumento, eliminarDocumento } = useLibreta(uid)
+  const { libreta, actualizarPerfil, actualizarDocumento, agregarDocumento, eliminarDocumento, agregarCursoStcw, actualizarCursoStcw, eliminarCursoStcw } = useLibreta(uid)
 
   function handleGuardar(datos) {
     if (viajeEditando) {
@@ -89,8 +89,21 @@ export default function App() {
     return <Onboarding onGuardar={guardarPerfil} />
   }
 
+  // Aplana documentos: la fila STCW (id '3') se reemplaza por sus cursos.
+  function docsConVencimiento() {
+    const out = []
+    libreta.documentos.forEach(d => {
+      if (d.id === '3') {
+        ;(d.cursos || []).forEach(c => out.push({ id: `stcw-${c.id}`, nombre: `STCW · ${c.nombre || 'curso'}`, vencimiento: c.vencimiento }))
+      } else {
+        out.push(d)
+      }
+    })
+    return out
+  }
+
   function contarAlertasLibreta() {
-    return libreta.documentos.filter(d => {
+    return docsConVencimiento().filter(d => {
       if (!d.vencimiento) return false
       const dias = Math.ceil((new Date(d.vencimiento) - new Date()) / (1000 * 60 * 60 * 24))
       return dias < 0 || dias <= 60
@@ -100,7 +113,7 @@ export default function App() {
   return (
     <div className="min-h-screen">
       <NetworkBanner />
-      <BannerVencimientos documentos={libreta.documentos} onIrLibreta={() => setTab('libreta')} />
+      <BannerVencimientos documentos={docsConVencimiento()} onIrLibreta={() => setTab('libreta')} />
       <Navbar tab={tab} setTab={setTab} user={user} onCerrarSesion={cerrarSesion} perfil={perfil} alertasLibreta={contarAlertasLibreta()} onAbrirBuzon={() => setBuzonAbierto(true)} />
 
       {/* Panel sectores a bordo */}
@@ -154,6 +167,9 @@ export default function App() {
             actualizarDocumento={actualizarDocumento}
             agregarDocumento={agregarDocumento}
             eliminarDocumento={eliminarDocumento}
+            agregarCursoStcw={agregarCursoStcw}
+            actualizarCursoStcw={actualizarCursoStcw}
+            eliminarCursoStcw={eliminarCursoStcw}
           />
         )}
         {tab === 'precios' && (

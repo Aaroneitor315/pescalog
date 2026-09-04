@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookOpen, User, FileText, AlertTriangle, CheckCircle, XCircle, Plus, Trash2, Save, Edit2 } from 'lucide-react'
+import { BookOpen, User, FileText, AlertTriangle, CheckCircle, XCircle, Plus, Trash2, Save, Edit2, GraduationCap } from 'lucide-react'
 
 function getEstado(vencimiento) {
   if (!vencimiento) return null
@@ -17,14 +17,25 @@ function fmtFecha(iso) {
   return `${d}/${m}/${y}`
 }
 
-export default function Libreta({ libreta, actualizarPerfil, actualizarDocumento, agregarDocumento, eliminarDocumento }) {
+export default function Libreta({ libreta, actualizarPerfil, actualizarDocumento, agregarDocumento, eliminarDocumento, agregarCursoStcw, actualizarCursoStcw, eliminarCursoStcw }) {
   const [editandoPerfil, setEditandoPerfil] = useState(!libreta.nombre)
   const [perfil, setPerfil] = useState({ nombre: libreta.nombre, dni: libreta.dni, cuil: libreta.cuil, nroLibreta: libreta.nroLibreta })
   const [guardadoPerfil, setGuardadoPerfil] = useState(false)
 
-  const alertas = libreta.documentos.filter(d => {
+  // Alertas: documentos comunes + cada curso STCW con nombre y vencimiento.
+  const alertas = []
+  libreta.documentos.forEach(d => {
+    if (d.id === '3') {
+      ;(d.cursos || []).forEach(c => {
+        const est = getEstado(c.vencimiento)
+        if (est && (est.tipo === 'vencido' || est.tipo === 'proximo')) {
+          alertas.push({ id: `stcw-${c.id}`, nombre: `STCW · ${c.nombre || 'curso'}`, vencimiento: c.vencimiento })
+        }
+      })
+      return
+    }
     const est = getEstado(d.vencimiento)
-    return est && (est.tipo === 'vencido' || est.tipo === 'proximo')
+    if (est && (est.tipo === 'vencido' || est.tipo === 'proximo')) alertas.push(d)
   })
 
   function guardarPerfil() {
@@ -148,6 +159,81 @@ export default function Libreta({ libreta, actualizarPerfil, actualizarDocumento
 
         <div className="space-y-3">
           {libreta.documentos.map((doc, idx) => {
+            // ── Fila STCW: grupo de cursos con vencimiento propio ──
+            if (doc.id === '3') {
+              const cursos = doc.cursos || []
+              // Resumen: el curso más próximo a vencer (o vencido) manda el chip.
+              const conFecha = cursos.filter(c => c.vencimiento)
+              const resumen = conFecha
+                .map(c => ({ c, est: getEstado(c.vencimiento) }))
+                .sort((a, b) => a.est.dias - b.est.dias)[0]
+              const IconR = resumen?.est.icon
+              return (
+                <div key={doc.id} className="bg-navy-700/50 border border-navy-600 rounded-xl p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <GraduationCap size={16} className="text-cyan-400" />
+                      <div>
+                        <p className="text-white font-medium leading-tight">STCW</p>
+                        <p className="text-xs text-slate-500">{cursos.length === 0 ? 'Sin cursos cargados' : `${cursos.length} curso${cursos.length > 1 ? 's' : ''}`}</p>
+                      </div>
+                    </div>
+                    {resumen && IconR && (
+                      <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs font-semibold ${resumen.est.bg} ${resumen.est.color}`}>
+                        <IconR size={12} />
+                        <span className="hidden sm:inline">{resumen.est.tipo === 'vencido' ? 'Hay vencido' : resumen.est.tipo === 'proximo' ? `Vence en ${resumen.est.dias}d` : 'Todos vigentes'}</span>
+                        <span className="sm:hidden">{resumen.est.tipo === 'vigente' ? '✓' : resumen.est.tipo === 'vencido' ? '✗' : '!'}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Lista de cursos STCW */}
+                  {cursos.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {cursos.map(curso => {
+                        const estC = getEstado(curso.vencimiento)
+                        const IconC = estC?.icon
+                        return (
+                          <div key={curso.id} className="bg-navy-800/60 border border-navy-600/60 rounded-lg p-2.5">
+                            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                              <div className="sm:col-span-6">
+                                <label className="text-[11px] text-slate-500 mb-1 block sm:hidden">Curso</label>
+                                <input type="text" className="text-sm py-1.5" placeholder="Ej: Lucha contra incendios"
+                                  value={curso.nombre} onChange={e => actualizarCursoStcw(curso.id, 'nombre', e.target.value)} />
+                              </div>
+                              <div className="sm:col-span-4">
+                                <label className="text-[11px] text-slate-500 mb-1 block sm:hidden">Vencimiento</label>
+                                <input type="date" className="text-sm py-1.5"
+                                  value={curso.vencimiento} onChange={e => actualizarCursoStcw(curso.id, 'vencimiento', e.target.value)} />
+                              </div>
+                              <div className="sm:col-span-2 flex items-center justify-between sm:justify-end gap-2">
+                                {estC && IconC ? (
+                                  <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs font-semibold ${estC.bg} ${estC.color}`}>
+                                    <IconC size={12} />
+                                    <span className="hidden sm:inline">{estC.label}</span>
+                                    <span className="sm:hidden">{estC.tipo === 'vigente' ? '✓' : estC.tipo === 'vencido' ? '✗' : '!'}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-600 text-xs">Sin fecha</span>
+                                )}
+                                <button onClick={() => eliminarCursoStcw(curso.id)} className="btn-danger p-1.5">
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  <button onClick={agregarCursoStcw} className="btn-ghost flex items-center gap-2 text-sm mt-3">
+                    <Plus size={14} /> Agregar curso STCW
+                  </button>
+                </div>
+              )
+            }
+
             const est = getEstado(doc.vencimiento)
             const Icon = est?.icon
             return (
