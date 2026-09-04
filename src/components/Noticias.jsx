@@ -64,7 +64,8 @@ export default function Noticias({ esAdmin = false, uid, onVolver }) {
       await uploadBytes(r, file)
       set('portadaURL', await getDownloadURL(r))
     } catch (e) {
-      alert('No se pudo subir la imagen. Probá de nuevo.')
+      console.error('subirPortada', e)
+      alert(`No se pudo subir la imagen.\n\nCódigo: ${e?.code || 'desconocido'}\n${e?.message || ''}`)
     } finally { setSubiendo(false) }
   }
 
