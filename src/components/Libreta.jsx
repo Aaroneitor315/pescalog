@@ -175,7 +175,7 @@ export default function Libreta({ libreta, actualizarPerfil, actualizarDocumento
                       <GraduationCap size={16} className="text-cyan-400" />
                       <div>
                         <p className="text-white font-medium leading-tight">STCW</p>
-                        <p className="text-xs text-slate-500">{cursos.length === 0 ? 'Sin cursos cargados' : `${cursos.length} curso${cursos.length > 1 ? 's' : ''}`}</p>
+                        <p className="text-xs text-slate-500">Cursos y certificaciones · cargá cada vencimiento</p>
                       </div>
                     </div>
                     {resumen && IconR && (
@@ -197,12 +197,16 @@ export default function Libreta({ libreta, actualizarPerfil, actualizarDocumento
                           <div key={curso.id} className="bg-navy-800/60 border border-navy-600/60 rounded-lg p-2.5">
                             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                               <div className="sm:col-span-6">
-                                <label className="text-[11px] text-slate-500 mb-1 block sm:hidden">Curso</label>
-                                <input type="text" className="text-sm py-1.5" placeholder="Ej: Lucha contra incendios"
-                                  value={curso.nombre} onChange={e => actualizarCursoStcw(curso.id, 'nombre', e.target.value)} />
+                                <p className="text-[11px] text-slate-500 mb-1">Curso</p>
+                                {curso.fijo ? (
+                                  <p className="text-sm text-white font-medium leading-snug">{curso.nombre}</p>
+                                ) : (
+                                  <input type="text" className="text-sm py-1.5" placeholder="Nombre del curso"
+                                    value={curso.nombre} onChange={e => actualizarCursoStcw(curso.id, 'nombre', e.target.value)} />
+                                )}
                               </div>
                               <div className="sm:col-span-4">
-                                <label className="text-[11px] text-slate-500 mb-1 block sm:hidden">Vencimiento</label>
+                                <label className="text-[11px] text-slate-500 mb-1 block">Vencimiento</label>
                                 <input type="date" className="text-sm py-1.5"
                                   value={curso.vencimiento} onChange={e => actualizarCursoStcw(curso.id, 'vencimiento', e.target.value)} />
                               </div>
@@ -216,9 +220,11 @@ export default function Libreta({ libreta, actualizarPerfil, actualizarDocumento
                                 ) : (
                                   <span className="text-slate-600 text-xs">Sin fecha</span>
                                 )}
-                                <button onClick={() => eliminarCursoStcw(curso.id)} className="btn-danger p-1.5">
-                                  <Trash2 size={13} />
-                                </button>
+                                {!curso.fijo && (
+                                  <button onClick={() => eliminarCursoStcw(curso.id)} className="btn-danger p-1.5">
+                                    <Trash2 size={13} />
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -228,7 +234,7 @@ export default function Libreta({ libreta, actualizarPerfil, actualizarDocumento
                   )}
 
                   <button onClick={agregarCursoStcw} className="btn-ghost flex items-center gap-2 text-sm mt-3">
-                    <Plus size={14} /> Agregar curso STCW
+                    <Plus size={14} /> Agregar otro curso
                   </button>
                 </div>
               )
